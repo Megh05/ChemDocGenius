@@ -47,16 +47,21 @@ export class MistralService {
 
   async processDocument(filePath: string, settings: Settings): Promise<ExtractedData> {
     try {
-      // Extract text from PDF
-      const pdfBuffer = fs.readFileSync(filePath);
-      const pdfData = await pdf(pdfBuffer);
-      const extractedText = pdfData.text;
+      // Extract text from PDF using Mistral OCR
+      const extractedText = await this.extractTextWithMistralOCR(filePath, settings);
       
       console.log("Extracted text length:", extractedText.length);
-      console.log("First 200 chars:", extractedText.substring(0, 200));
+      console.log("First 500 chars:", extractedText.substring(0, 500));
+      console.log("Last 200 chars:", extractedText.substring(-200));
+
+      if (extractedText.length < 10) {
+        throw new Error("No meaningful text extracted from document");
+      }
 
       // Use Mistral AI to extract structured data
       const structuredData = await this.extractStructuredData(extractedText, settings);
+      
+      console.log("Mistral response:", JSON.stringify(structuredData, null, 2));
       
       // Validate the extracted data
       return extractedDataSchema.parse(structuredData);
@@ -64,6 +69,65 @@ export class MistralService {
       console.error("Document processing failed:", error);
       throw new Error(`Failed to process document: ${error.message}`);
     }
+  }
+
+  private async extractTextWithMistralOCR(filePath: string, settings: Settings): Promise<string> {
+    try {
+      // Use Mistral's dedicated OCR API
+      const apiKey = this.getApiKey(settings);
+      const pdfBuffer = fs.readFileSync(filePath);
+      const base64Pdf = pdfBuffer.toString('base64');
+
+      console.log("Calling Mistral OCR API...");
+      const response = await fetch(`${this.baseUrl}/ocr`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'mistral-ocr-latest',
+          document: {
+            type: 'document_url',
+            document_url: `data:application/pdf;base64,${base64Pdf}`
+          }
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Mistral OCR response status:", response.status);
+        
+        // Extract text from all pages
+        let fullText = '';
+        if (result.pages && Array.isArray(result.pages)) {
+          for (const page of result.pages) {
+            if (page.markdown) {
+              fullText += page.markdown + '\n\n';
+            }
+          }
+        }
+        
+        if (fullText.length > 10) {
+          console.log("Mistral OCR successful - extracted", fullText.length, "characters");
+          return fullText;
+        }
+      } else {
+        const errorText = await response.text();
+        console.log("Mistral OCR API error:", response.status, errorText);
+      }
+      
+      console.log("Mistral OCR failed, falling back to pdf-parse");
+    } catch (error) {
+      console.log("Mistral OCR error:", error);
+      console.log("Falling back to pdf-parse");
+    }
+
+    // Fallback to pdf-parse if Mistral OCR fails
+    const pdfBuffer = fs.readFileSync(filePath);
+    const pdfData = await pdf(pdfBuffer);
+    console.log("Using pdf-parse, extracted", pdfData.text.length, "characters");
+    return pdfData.text;
   }
 
   private async extractStructuredData(text: string, settings: Settings): Promise<any> {
@@ -265,6 +329,8 @@ Return only the JSON object with populated detectedSections and fields:`;
 
       const parsedData = JSON.parse(jsonMatch[0]);
       
+      console.log("Raw Mistral LLM response:", parsedData);
+      
       // Ensure all fields have unique IDs
       if (parsedData.fields) {
         parsedData.fields.forEach((field: any, index: number) => {
@@ -273,6 +339,46 @@ Return only the JSON object with populated detectedSections and fields:`;
           }
         });
       }
+      
+      // Ensure detectedSections is always an array and populated
+      if (!parsedData.detectedSections || !Array.isArray(parsedData.detectedSections) || parsedData.detectedSections.length === 0) {
+        console.log("No sections detected by Mistral, creating default sections");
+        
+        // Create default sections based on fields
+        const sections = new Map();
+        if (parsedData.fields && Array.isArray(parsedData.fields)) {
+          parsedData.fields.forEach((field: any) => {
+            const sectionName = field.section || "Document Content";
+            if (!sections.has(sectionName)) {
+              sections.set(sectionName, []);
+            }
+            sections.get(sectionName).push(field);
+          });
+        }
+        
+        // If no fields either, create minimum viable sections
+        if (sections.size === 0) {
+          sections.set("Document Information", []);
+          sections.set("Content", []);
+        }
+        
+        parsedData.detectedSections = Array.from(sections.entries()).map(([title, fields], index) => ({
+          id: `section_${index + 1}`,
+          title: title,
+          content: `${title} section`,
+          type: "field_group",
+          preview: fields.length > 0 ? `${fields.length} fields detected` : "Empty section",
+          fields: fields,
+          selected: false,
+          order: index + 1
+        }));
+      }
+      
+      console.log("Final processed data:", {
+        documentType: parsedData.documentType,
+        sectionsCount: parsedData.detectedSections?.length || 0,
+        fieldsCount: parsedData.fields?.length || 0
+      });
       
       return parsedData;
     } catch (error) {
