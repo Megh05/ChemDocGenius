@@ -276,11 +276,11 @@ Return only the JSON object:`;
               id: `field_${fieldId++}`,
               label: label.trim(),
               value: value,
-              type: "text",
+              type: "text" as const,
               section: "Document Information",
               required: false,
               layout: {
-                structureType: "field",
+                structureType: "field" as const,
                 order: index + 1
               }
             });
@@ -291,11 +291,11 @@ Return only the JSON object:`;
             id: `paragraph_${fieldId++}`,
             label: `Content ${fieldId}`,
             value: trimmedLine,
-            type: "paragraph",
+            type: "paragraph" as const,
             section: "Document Content",
             required: false,
             layout: {
-              structureType: "paragraph",
+              structureType: "paragraph" as const,
               order: index + 1
             }
           });
@@ -305,11 +305,11 @@ Return only the JSON object:`;
             id: `heading_${fieldId++}`,
             label: trimmedLine,
             value: trimmedLine,
-            type: "heading",
+            type: "heading" as const,
             section: "Document Content",
             required: false,
             layout: {
-              structureType: "heading",
+              structureType: "heading" as const,
               level: 2,
               order: index + 1
             }
@@ -317,19 +317,46 @@ Return only the JSON object:`;
         }
       });
       
+      // Create properly structured sections
+      const documentInfoFields = fields.filter(f => f.section === "Document Information");
+      const contentFields = fields.filter(f => f.section === "Document Content");
+      
+      const detectedSections = [
+        {
+          id: "doc_info_section",
+          title: "Document Information", 
+          content: "Basic document information and metadata",
+          type: "field_group" as const,
+          preview: documentInfoFields.length > 0 ? documentInfoFields[0].value : "Document details",
+          fields: documentInfoFields,
+          selected: false,
+          order: 1
+        },
+        {
+          id: "doc_content_section", 
+          title: "Document Content",
+          content: "Main document content and extracted text",
+          type: "field_group" as const,
+          preview: contentFields.length > 0 ? contentFields[0].value : "Document content",
+          fields: contentFields,
+          selected: false,
+          order: 2
+        }
+      ];
+
       return {
         documentType: "Certificate of Analysis",
-        detectedSections: ["Document Information", "Document Content"],
+        detectedSections: detectedSections,
         fields: fields.length > 0 ? fields : [
           {
             id: "document_title",
             label: "Document Title",
             value: "Extracted Document",
-            type: "text",
+            type: "text" as const,
             section: "Document Information",
             required: false,
             layout: {
-              structureType: "field",
+              structureType: "field" as const,
               order: 1
             }
           }
