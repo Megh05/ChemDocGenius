@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, CheckCircle, AlertCircle, FileText, Brain, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useMutation } from "@tanstack/react-query";
@@ -13,6 +13,13 @@ interface ProcessingStepProps {
 
 export default function ProcessingStep({ document }: ProcessingStepProps) {
   const { setCurrentDocument, goToStep } = usePipeline();
+  const [currentProcessingStep, setCurrentProcessingStep] = useState(0);
+  const [processingSteps, setProcessingSteps] = useState([
+    { id: 1, name: "Uploading Document", icon: FileText, completed: false, active: false },
+    { id: 2, name: "Extracting Text (OCR)", icon: FileText, completed: false, active: false },
+    { id: 3, name: "AI Analysis", icon: Brain, completed: false, active: false },
+    { id: 4, name: "Generating Structure", icon: Sparkles, completed: false, active: false },
+  ]);
 
   const processMutation = useMutation({
     mutationFn: async (documentId: string) => {
@@ -21,15 +28,49 @@ export default function ProcessingStep({ document }: ProcessingStepProps) {
     },
     onSuccess: (processedDocument) => {
       setCurrentDocument(processedDocument);
-      goToStep(3);
+      // Complete all steps before transitioning
+      setProcessingSteps(prev => prev.map(step => ({ ...step, completed: true, active: false })));
+      setTimeout(() => goToStep(3), 1000);
     },
   });
 
   useEffect(() => {
-    if (document && document.status === "uploaded") {
-      processMutation.mutate(document.id);
+    if (document && document.status === "uploaded" && !processMutation.isPending) {
+      // Start processing with step animations
+      setCurrentProcessingStep(0);
+      setProcessingSteps(prev => prev.map((step, index) => ({ 
+        ...step, 
+        completed: false, 
+        active: index === 0 
+      })));
+      
+      // Animate through processing steps
+      const stepInterval = setInterval(() => {
+        setCurrentProcessingStep(prev => {
+          const next = prev + 1;
+          if (next >= processingSteps.length) {
+            clearInterval(stepInterval);
+            return prev;
+          }
+          
+          setProcessingSteps(steps => steps.map((step, index) => ({
+            ...step,
+            completed: index < next,
+            active: index === next
+          })));
+          
+          return next;
+        });
+      }, 1500);
+      
+      // Start actual processing
+      setTimeout(() => {
+        processMutation.mutate(document.id);
+      }, 500);
+      
+      return () => clearInterval(stepInterval);
     }
-  }, [document]);
+  }, [document?.id]);
 
   if (!document) {
     return (
@@ -65,19 +106,79 @@ export default function ProcessingStep({ document }: ProcessingStepProps) {
           </p>
         </div>
 
-        {/* Processing Status */}
-        <div className="space-y-4">
+        {/* Enhanced Processing Status */}
+        <div className="space-y-6">
           {isProcessing && (
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-sm font-medium text-gray-900">
-                  Extracting text and data...
-                </span>
+            <div className="space-y-4">
+              {/* Step-by-step Progress */}
+              <div className="space-y-3">
+                {processingSteps.map((step, index) => {
+                  const Icon = step.icon;
+                  return (
+                    <div 
+                      key={step.id}
+                      className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-500 ${
+                        step.completed 
+                          ? 'bg-green-50 border border-green-200' 
+                          : step.active 
+                          ? 'bg-blue-50 border border-blue-200' 
+                          : 'bg-gray-50 border border-gray-200'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        step.completed 
+                          ? 'bg-green-500' 
+                          : step.active 
+                          ? 'bg-blue-500' 
+                          : 'bg-gray-300'
+                      }`}>
+                        {step.completed ? (
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        ) : step.active ? (
+                          <Loader2 className="w-4 h-4 text-white animate-spin" />
+                        ) : (
+                          <Icon className="w-4 h-4 text-white" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <span className={`text-sm font-medium ${
+                          step.completed 
+                            ? 'text-green-900' 
+                            : step.active 
+                            ? 'text-blue-900' 
+                            : 'text-gray-600'
+                        }`}>
+                          {step.name}
+                        </span>
+                        {step.active && (
+                          <div className="text-xs text-blue-600 mt-1">Processing...</div>
+                        )}
+                        {step.completed && (
+                          <div className="text-xs text-green-600 mt-1">✓ Complete</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <Progress value={65} className="h-2" data-testid="progress-processing" />
-              <p className="text-xs text-gray-500">
-                This may take a few moments depending on document size
+              
+              {/* Overall Progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Overall Progress</span>
+                  <span className="text-gray-900 font-medium">
+                    {Math.round(((currentProcessingStep + 1) / processingSteps.length) * 100)}%
+                  </span>
+                </div>
+                <Progress 
+                  value={((currentProcessingStep + 1) / processingSteps.length) * 100} 
+                  className="h-3" 
+                  data-testid="progress-processing" 
+                />
+              </div>
+              
+              <p className="text-xs text-gray-500 text-center">
+                Using Mistral AI to intelligently extract and structure your document data
               </p>
             </div>
           )}
