@@ -1,0 +1,114 @@
+import { ExtractedData } from "@shared/schema";
+
+interface LivePreviewProps {
+  data: ExtractedData;
+}
+
+export default function LivePreview({ data }: LivePreviewProps) {
+  return (
+    <div className="p-6 bg-gray-50">
+      <h3 className="text-base font-semibold text-gray-900 mb-4">Company Document Preview</h3>
+      
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[500px]">
+        
+        {/* Company Header */}
+        <div className="border-b border-gray-200 pb-4 mb-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-3">
+                <span className="text-white font-bold text-xl">AC</span>
+              </div>
+              <h1 className="text-lg font-bold text-gray-900">Apex Chemicals Corp.</h1>
+              <p className="text-sm text-gray-600">Advanced Chemical Solutions</p>
+            </div>
+            <div className="text-right text-xs text-gray-500">
+              <div>Generated: <span data-testid="text-generation-date">{new Date().toLocaleDateString()}</span></div>
+              <div>Doc ID: <span data-testid="text-company-doc-id">AC-{data.document.id}</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Document Content */}
+        <div className="space-y-4">
+          
+          {/* Product Identification */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-blue-900 text-sm mb-2">PRODUCT IDENTIFICATION</h3>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="font-medium text-blue-800">Product Name:</span>
+                <div className="text-blue-900" data-testid="preview-product-name">{data.product.name}</div>
+              </div>
+              <div>
+                <span className="font-medium text-blue-800">CAS Number:</span>
+                <div className="text-blue-900" data-testid="preview-cas-number">{data.product.casNumber}</div>
+              </div>
+              <div>
+                <span className="font-medium text-blue-800">Formula:</span>
+                <div className="text-blue-900" data-testid="preview-formula">{data.product.formula}</div>
+              </div>
+              <div>
+                <span className="font-medium text-blue-800">Grade:</span>
+                <div className="text-blue-900" data-testid="preview-grade">{data.product.grade}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Supplier Information */}
+          <div className="bg-gray-100 p-4 rounded-lg">
+            <h3 className="font-semibold text-gray-900 text-sm mb-2">SUPPLIER INFORMATION</h3>
+            <div className="text-xs space-y-1">
+              <div>
+                <span className="font-medium">Company:</span> 
+                <span className="ml-1" data-testid="preview-supplier-name">{data.supplier.name}</span>
+              </div>
+              <div>
+                <span className="font-medium">Address:</span> 
+                <span className="ml-1" data-testid="preview-supplier-address">{data.supplier.address}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="font-medium">Phone:</span> 
+                  <span className="ml-1" data-testid="preview-supplier-phone">{data.supplier.phone}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Emergency:</span> 
+                  <span className="ml-1" data-testid="preview-emergency-contact">{data.supplier.emergency}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Hazard Information */}
+          <div className="bg-red-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-red-900 text-sm mb-2">HAZARD IDENTIFICATION</h3>
+            <div className="space-y-2">
+              {data.hazards.length > 0 ? (
+                data.hazards.map((hazard, index) => (
+                  <div key={index} className="flex items-center space-x-2 text-xs">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <span className="text-red-900" data-testid={`preview-hazard-${index}`}>
+                      {hazard.category} - {hazard.signal}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-red-700" data-testid="preview-no-hazards">
+                  No hazard information available
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-200 pt-4 mt-6">
+            <div className="text-xs text-gray-500 text-center">
+              <p>This document was generated by Apex Chemicals Corp. automated processing system.</p>
+              <p className="mt-1">For questions or concerns, contact our technical support team.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
