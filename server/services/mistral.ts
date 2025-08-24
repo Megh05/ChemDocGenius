@@ -80,7 +80,18 @@ Your tasks:
 RETURN THIS EXACT JSON STRUCTURE:
 {
   "documentType": "detected document type",
-  "detectedSections": ["section1", "section2"],
+  "detectedSections": [
+    {
+      "id": "section1_id",
+      "title": "Section 1 Title",
+      "content": "Section content or description",
+      "type": "field_group",
+      "preview": "Brief preview of section content",
+      "fields": [],
+      "selected": false,
+      "order": 1
+    }
+  ],
   "fields": [
     {
       "id": "unique_id",

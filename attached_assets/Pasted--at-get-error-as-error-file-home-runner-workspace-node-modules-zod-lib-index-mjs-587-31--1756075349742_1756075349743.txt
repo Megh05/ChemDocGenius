@@ -1,0 +1,67 @@
+]
+    at get error [as error] (file:///home/runner/workspace/node_modules/zod/lib/index.mjs:587:31)
+    at ZodObject.parse (file:///home/runner/workspace/node_modules/zod/lib/index.mjs:663:22)
+    at MistralService.processDocument (/home/runner/workspace/server/services/mistral.ts:59:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:78:29) {
+  issues: [
+    {
+      code: 'invalid_type',
+      expected: 'object',
+      received: 'string',
+      path: [Array],
+      message: 'Expected object, received string'
+    },
+    {
+      code: 'invalid_type',
+      expected: 'object',
+      received: 'string',
+      path: [Array],
+      message: 'Expected object, received string'
+    }
+  ],
+  addIssue: [Function (anonymous)],
+  addIssues: [Function (anonymous)],
+  errors: [
+    {
+      code: 'invalid_type',
+      expected: 'object',
+      received: 'string',
+      path: [Array],
+      message: 'Expected object, received string'
+    },
+    {
+      code: 'invalid_type',
+      expected: 'object',
+      received: 'string',
+      path: [Array],
+      message: 'Expected object, received string'
+    }
+  ]
+}
+Processing error: Error: Failed to process document: [
+  {
+    "code": "invalid_type",
+    "expected": "object",
+    "received": "string",
+    "path": [
+      "detectedSections",
+      0
+    ],
+    "message": "Expected object, received string"
+  },
+  {
+    "code": "invalid_type",
+    "expected": "object",
+    "received": "string",
+    "path": [
+      "detectedSections",
+      1
+    ],
+    "message": "Expected object, received string"
+  }
+]
+    at MistralService.processDocument (/home/runner/workspace/server/services/mistral.ts:62:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:78:29)
+10:39:34 PM [express] POST /api/documents/7f2c27fe-6f11-456e-b8b0-151479318823/process 500 in 2607m
