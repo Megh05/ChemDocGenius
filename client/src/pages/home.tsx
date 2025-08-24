@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { FileText, Settings, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, Settings, Clock, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
 import StepProgress from "@/components/step-progress";
 import UploadStep from "@/components/upload-step";
 import ProcessingStep from "@/components/processing-step";
@@ -9,11 +10,58 @@ import GenerateStep from "@/components/generate-step";
 import SettingsModal from "@/components/settings-modal";
 import HistoryModal from "@/components/history-modal";
 import { usePipeline } from "@/hooks/use-pipeline";
+import { getStoredApiKey, decryptApiKey } from "@/lib/crypto";
 
 export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [llmStatus, setLlmStatus] = useState<"checking" | "online" | "offline">("checking");
   const { currentStep, currentDocument, goToStep } = usePipeline();
+
+  // Query to check LLM connection status
+  const connectionQuery = useQuery({
+    queryKey: ["/api/settings/test"],
+    queryFn: async () => {
+      const response = await fetch("/api/settings/test", { method: "POST" });
+      return response.json();
+    },
+    refetchInterval: 30000, // Check every 30 seconds
+    retry: false,
+  });
+
+  // Update LLM status based on connection query
+  useEffect(() => {
+    if (connectionQuery.isLoading) {
+      setLlmStatus("checking");
+    } else if (connectionQuery.data?.connected) {
+      setLlmStatus("online");
+    } else {
+      setLlmStatus("offline");
+    }
+  }, [connectionQuery.isLoading, connectionQuery.data]);
+
+  // Auto-load API key from localStorage on startup
+  useEffect(() => {
+    const loadStoredApiKey = async () => {
+      const storedKey = getStoredApiKey();
+      if (storedKey) {
+        try {
+          const decryptedKey = await decryptApiKey(storedKey);
+          // Save to server if we have a key
+          if (decryptedKey) {
+            await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ encryptedApiKey: storedKey })
+            });
+          }
+        } catch (error) {
+          console.error("Failed to load stored API key:", error);
+        }
+      }
+    };
+    loadStoredApiKey();
+  }, []);
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -42,6 +90,26 @@ export default function Home() {
             <h1 className="text-xl font-semibold text-gray-900">ChemDoc Processor</h1>
           </div>
           <div className="flex items-center space-x-4">
+            {/* LLM Status Indicator */}
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+              llmStatus === "online" 
+                ? "bg-green-100 text-green-800" 
+                : llmStatus === "offline" 
+                ? "bg-red-100 text-red-800" 
+                : "bg-yellow-100 text-yellow-800"
+            }`} data-testid="llm-status-indicator">
+              {llmStatus === "online" ? (
+                <Wifi className="w-3 h-3" />
+              ) : llmStatus === "offline" ? (
+                <WifiOff className="w-3 h-3" />
+              ) : (
+                <div className="w-3 h-3 border border-yellow-600 border-t-transparent rounded-full animate-spin" />
+              )}
+              <span>
+                {llmStatus === "online" ? "LLM Online" : llmStatus === "offline" ? "LLM Offline" : "Checking..."}
+              </span>
+            </div>
+            
             <Button 
               variant="ghost" 
               size="sm"

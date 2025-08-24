@@ -42,24 +42,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 }
 
 export function usePipeline() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
-
-  const goToStep = (step: number) => {
-    setCurrentStep(step);
-  };
-
-  const resetPipeline = () => {
-    setCurrentStep(1);
-    setCurrentDocument(null);
-  };
-
-  return {
-    currentStep,
-    currentDocument,
-    setCurrentStep,
-    setCurrentDocument,
-    goToStep,
-    resetPipeline,
-  };
+  const context = useContext(PipelineContext);
+  if (context === undefined) {
+    throw new Error("usePipeline must be used within a PipelineProvider");
+  }
+  return context;
 }
