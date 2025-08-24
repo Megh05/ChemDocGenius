@@ -333,13 +333,37 @@ Return only the JSON object with populated detectedSections and fields:`;
         throw new Error("No content returned from Mistral API");
       }
 
-      // Parse the JSON response
+      // Parse the JSON response with better error handling
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        console.log("No JSON found in response. Content:", content.substring(0, 500));
         throw new Error("No valid JSON found in response");
       }
 
-      const parsedData = JSON.parse(jsonMatch[0]);
+      let parsedData;
+      try {
+        parsedData = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        console.log("JSON parse error at position:", parseError.message);
+        console.log("Raw JSON (first 1000 chars):", jsonMatch[0].substring(0, 1000));
+        console.log("Raw JSON (around error position):", jsonMatch[0].substring(14800, 15000));
+        
+        // Try to fix common JSON issues
+        let fixedJson = jsonMatch[0]
+          .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+          .replace(/([{,]\s*)(\w+):/g, '$1"$2":') // Add quotes to unquoted keys
+          .replace(/:\s*([^",\[\]{}\s][^",\[\]{}]*[^",\[\]{}\s])\s*([,\]}])/g, ': "$1"$2'); // Quote unquoted string values
+        
+        try {
+          console.log("Attempting to parse fixed JSON...");
+          parsedData = JSON.parse(fixedJson);
+          console.log("Successfully parsed fixed JSON!");
+        } catch (fixedError) {
+          console.log("Fixed JSON also failed:", fixedError.message);
+          console.log("Fixed JSON (around error):", fixedJson.substring(14800, 15000));
+          throw new Error(`JSON parsing failed: ${parseError.message}`);
+        }
+      }
       
       console.log("Raw Mistral LLM response:", parsedData);
       
