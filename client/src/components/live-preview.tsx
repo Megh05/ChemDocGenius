@@ -1,167 +1,165 @@
-import { ExtractedData } from "@shared/schema";
+import { FileText, Eye } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExtractedData, DynamicField } from "@shared/schema";
 
 interface LivePreviewProps {
   data: ExtractedData;
 }
 
 export default function LivePreview({ data }: LivePreviewProps) {
+  // Group fields by section for organized display
+  const groupedFields = data.fields.reduce((acc, field) => {
+    if (!acc[field.section]) {
+      acc[field.section] = [];
+    }
+    acc[field.section].push(field);
+    return acc;
+  }, {} as Record<string, DynamicField[]>);
+
+  const formatFieldValue = (field: DynamicField) => {
+    if (field.value === null || field.value === undefined || field.value === "") {
+      return <span className="text-gray-400 italic">Not specified</span>;
+    }
+
+    switch (field.type) {
+      case "boolean":
+        return <span className={field.value ? "text-green-600" : "text-red-600"}>
+          {field.value ? "Yes" : "No"}
+        </span>;
+      case "date":
+        return field.value ? new Date(field.value.toString()).toLocaleDateString() : "Not specified";
+      case "number":
+        return <span className="font-mono">{field.value}</span>;
+      case "email":
+        return <a href={`mailto:${field.value}`} className="text-blue-600 hover:underline">
+          {field.value}
+        </a>;
+      case "phone":
+        return <a href={`tel:${field.value}`} className="text-blue-600 hover:underline">
+          {field.value}
+        </a>;
+      default:
+        return field.value.toString();
+    }
+  };
+
   return (
-    <div className="p-6 bg-gray-50">
-      <h3 className="text-base font-semibold text-gray-900 mb-4">Live PDF Preview</h3>
-      
-      <div className="bg-white rounded-lg shadow-lg border border-gray-300 p-8 min-h-[600px] max-w-[8.5in] mx-auto" style={{ fontFamily: 'serif' }}>
-        
-        {/* Company Header - PDF Style */}
-        <div className="border-b-2 border-blue-900 pb-6 mb-8">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-blue-900 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-2xl">AC</span>
+    <div className="w-1/2 border-l border-gray-200 bg-gray-50">
+      <div className="p-6 border-b border-gray-200 bg-white">
+        <div className="flex items-center space-x-2">
+          <Eye className="w-5 h-5 text-blue-600" />
+          <h3 className="text-lg font-medium text-gray-900">Live Preview</h3>
+        </div>
+        <p className="text-sm text-gray-600 mt-1">
+          Preview of the generated document based on extracted data
+        </p>
+      </div>
+
+      <div className="p-6 overflow-y-auto h-full">
+        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+          {/* Document Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">NTCB Certificate of Analysis</h1>
+                <p className="text-blue-100 mt-1">
+                  Document Type: {data.documentType}
+                </p>
+              </div>
+              <FileText className="w-8 h-8 text-blue-200" />
+            </div>
+            
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-blue-200">Generated:</span>
+                <span className="ml-2">{new Date().toLocaleDateString()}</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-blue-900 mb-1">Apex Chemicals Corp.</h1>
-                <p className="text-lg text-blue-700 font-medium">Advanced Chemical Solutions</p>
-                <p className="text-sm text-gray-600 mt-1">ISO 9001:2015 Certified</p>
-              </div>
-            </div>
-            <div className="text-right text-sm text-gray-600 bg-gray-50 p-3 rounded border">
-              <div className="font-semibold text-gray-900">Document Details</div>
-              <div className="mt-1">Generated: <span data-testid="text-generation-date">{new Date().toLocaleDateString()}</span></div>
-              <div>Doc ID: <span data-testid="text-company-doc-id" className="font-mono">AC-{data.document.id}</span></div>
-              <div>Rev: {data.document.revision}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Document Content */}
-        <div className="space-y-4">
-          
-          {/* Product Identification - PDF Style */}
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-blue-900 mb-4 pb-2 border-b border-blue-200">
-              1. PRODUCT IDENTIFICATION
-            </h2>
-            <div className="bg-blue-50 border border-blue-200 p-6 rounded">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                <div className="space-y-3">
-                  <div>
-                    <div className="font-semibold text-blue-900 uppercase tracking-wide">Product Name:</div>
-                    <div className="text-gray-900 text-base font-medium mt-1" data-testid="preview-product-name">
-                      {data.product.name}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-blue-900 uppercase tracking-wide">Molecular Formula:</div>
-                    <div className="text-gray-900 font-mono text-base mt-1" data-testid="preview-formula">
-                      {data.product.formula}
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <div className="font-semibold text-blue-900 uppercase tracking-wide">CAS Registry Number:</div>
-                    <div className="text-gray-900 font-mono text-base mt-1" data-testid="preview-cas-number">
-                      {data.product.casNumber}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-blue-900 uppercase tracking-wide">Grade/Purity:</div>
-                    <div className="text-gray-900 text-base mt-1" data-testid="preview-grade">
-                      {data.product.grade} • {data.product.purity}
-                    </div>
-                  </div>
-                </div>
+                <span className="text-blue-200">Total Fields:</span>
+                <span className="ml-2">{data.fields.length}</span>
               </div>
             </div>
           </div>
 
-          {/* Supplier Information - PDF Style */}
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-blue-900 mb-4 pb-2 border-b border-blue-200">
-              2. SUPPLIER INFORMATION
-            </h2>
-            <div className="bg-gray-50 border border-gray-200 p-6 rounded">
-              <div className="space-y-4 text-sm">
-                <div>
-                  <div className="font-semibold text-gray-900 uppercase tracking-wide">Company Name:</div>
-                  <div className="text-gray-900 text-base mt-1" data-testid="preview-supplier-name">
-                    {data.supplier.name}
-                  </div>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 uppercase tracking-wide">Address:</div>
-                  <div className="text-gray-900 text-base mt-1 leading-relaxed" data-testid="preview-supplier-address">
-                    {data.supplier.address}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <div className="font-semibold text-gray-900 uppercase tracking-wide">Phone Number:</div>
-                    <div className="text-gray-900 font-mono text-base mt-1" data-testid="preview-supplier-phone">
-                      {data.supplier.phone}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 uppercase tracking-wide">Emergency Contact:</div>
-                    <div className="text-red-700 font-mono text-base font-medium mt-1" data-testid="preview-emergency-contact">
-                      {data.supplier.emergency}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Hazard Information - PDF Style */}
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-red-900 mb-4 pb-2 border-b border-red-200">
-              3. HAZARD IDENTIFICATION
-            </h2>
-            <div className="bg-red-50 border-2 border-red-200 p-6 rounded">
-              {data.hazards.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="font-semibold text-red-900 uppercase tracking-wide text-sm mb-3">
-                    Classified Hazards:
-                  </div>
-                  {data.hazards.map((hazard, index) => (
-                    <div key={index} className="flex items-start space-x-3 p-3 bg-red-100 border border-red-300 rounded">
-                      <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-white text-xs font-bold">!</span>
+          {/* Document Sections */}
+          <div className="p-6 space-y-8">
+            {Object.entries(groupedFields).map(([sectionName, sectionFields]) => (
+              <div key={sectionName} className="space-y-4">
+                <h2 className="text-xl font-semibold text-blue-800 border-b-2 border-blue-200 pb-2">
+                  {sectionName.toUpperCase()}
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sectionFields.map((field) => (
+                    <div key={field.id} className="space-y-1">
+                      <div className="flex items-start justify-between">
+                        <dt className="text-sm font-medium text-gray-700">
+                          {field.label}:
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </dt>
                       </div>
-                      <div>
-                        <div className="font-bold text-red-900 text-base" data-testid={`preview-hazard-${index}`}>
-                          {hazard.category}
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {formatFieldValue(field)}
+                      </dd>
+                      {field.type !== "text" && (
+                        <div className="text-xs text-gray-500">
+                          Type: {field.type}
                         </div>
-                        <div className="text-red-800 text-sm font-medium">
-                          Signal Word: <span className="uppercase">{hazard.signal}</span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <div className="text-red-700 font-medium" data-testid="preview-no-hazards">
-                    No hazard classifications identified
-                  </div>
-                  <div className="text-red-600 text-sm mt-1">
-                    Please verify hazard information with supplier documentation
-                  </div>
+              </div>
+            ))}
+
+            {/* Metadata Section */}
+            {data.metadata && (
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <h2 className="text-xl font-semibold text-blue-800 border-b-2 border-blue-200 pb-2">
+                  DOCUMENT METADATA
+                </h2>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {data.metadata.extractedAt && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-700">Extracted At:</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {new Date(data.metadata.extractedAt).toLocaleString()}
+                      </dd>
+                    </div>
+                  )}
+                  {data.metadata.confidence && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-700">Confidence Score:</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        <span className={`font-semibold ${
+                          data.metadata.confidence > 0.8 ? 'text-green-600' :
+                          data.metadata.confidence > 0.6 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {(data.metadata.confidence * 100).toFixed(1)}%
+                        </span>
+                      </dd>
+                    </div>
+                  )}
+                  {data.metadata.totalFields && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-700">Total Fields:</dt>
+                      <dd className="text-sm text-gray-900 mt-1">{data.metadata.totalFields}</dd>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* Footer - PDF Style */}
-          <div className="border-t-2 border-blue-900 pt-6 mt-8">
-            <div className="bg-blue-900 text-white p-4 rounded text-center">
-              <div className="font-bold text-sm mb-2">APEX CHEMICALS CORP. - AUTOMATED DOCUMENT PROCESSING</div>
-              <div className="text-xs opacity-90">
-                This document was generated automatically from supplier documentation. 
-                For technical support or questions, contact our chemical safety team.
+          {/* Footer */}
+          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div>
+                <span className="font-medium">Nano Tech Chemical Brothers Pvt. Ltd.</span>
               </div>
-              <div className="text-xs opacity-75 mt-2">
-                Document generated on {new Date().toLocaleDateString()} • Confidential & Proprietary
+              <div>
+                Generated by ChemDoc Processor
               </div>
             </div>
           </div>

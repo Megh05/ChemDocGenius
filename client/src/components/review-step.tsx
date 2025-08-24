@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { RotateCcw, Plus, X } from "lucide-react";
+import { RotateCcw, Plus, X, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { usePipeline } from "@/hooks/use-pipeline";
-import { Document, ExtractedData, Hazard } from "@shared/schema";
+import { Document, ExtractedData, DynamicField } from "@shared/schema";
 import LivePreview from "@/components/live-preview";
 
 interface ReviewStepProps {
@@ -34,44 +36,41 @@ export default function ReviewStep({ document }: ReviewStepProps) {
     },
   });
 
-  const handleInputChange = (section: string, field: string, value: string) => {
+  const handleFieldChange = (fieldId: string, value: string | number | boolean) => {
     if (!formData) return;
     
     setFormData(prev => ({
       ...prev!,
-      [section]: {
-        ...prev![section as keyof ExtractedData],
-        [field]: value
-      }
-    }));
-  };
-
-  const handleHazardChange = (index: number, field: keyof Hazard, value: string) => {
-    if (!formData) return;
-    
-    setFormData(prev => ({
-      ...prev!,
-      hazards: prev!.hazards.map((hazard, i) => 
-        i === index ? { ...hazard, [field]: value } : hazard
+      fields: prev!.fields.map(field => 
+        field.id === fieldId ? { ...field, value } : field
       )
     }));
   };
 
-  const addHazard = () => {
+  const addField = (section: string) => {
     if (!formData) return;
     
+    const newField: DynamicField = {
+      id: `field_${Date.now()}`,
+      label: "New Field",
+      value: "",
+      type: "text",
+      section,
+      required: false
+    };
+
     setFormData(prev => ({
       ...prev!,
-      hazards: [...prev!.hazards, { category: "", signal: "" }]
+      fields: [...prev!.fields, newField]
     }));
   };
 
-  const removeHazard = (index: number) => {
+  const removeField = (fieldId: string) => {
     if (!formData) return;
     
     setFormData(prev => ({
       ...prev!,
-      hazards: prev!.hazards.filter((_, i) => i !== index)
+      fields: prev!.fields.filter(field => field.id !== fieldId)
     }));
   };
 
@@ -81,6 +80,115 @@ export default function ReviewStep({ document }: ReviewStepProps) {
       goToStep(4);
     }
   };
+
+  const renderField = (field: DynamicField) => {
+    const commonProps = {
+      id: field.id,
+      value: field.value?.toString() || "",
+      onChange: (e: any) => {
+        let value: string | number | boolean = e.target.value;
+        if (field.type === "number") {
+          value = parseFloat(e.target.value) || 0;
+        } else if (field.type === "boolean") {
+          value = e.target.checked;
+        }
+        handleFieldChange(field.id, value);
+      },
+      "data-testid": `input-${field.id}`
+    };
+
+    switch (field.type) {
+      case "textarea":
+        return (
+          <Textarea
+            {...commonProps}
+            className="min-h-[80px]"
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+      
+      case "number":
+        return (
+          <Input
+            {...commonProps}
+            type="number"
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+      
+      case "date":
+        return (
+          <Input
+            {...commonProps}
+            type="date"
+          />
+        );
+      
+      case "email":
+        return (
+          <Input
+            {...commonProps}
+            type="email"
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+      
+      case "phone":
+        return (
+          <Input
+            {...commonProps}
+            type="tel"
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+      
+      case "select":
+        return (
+          <Select value={field.value?.toString() || ""} onValueChange={(value) => handleFieldChange(field.id, value)}>
+            <SelectTrigger data-testid={`select-${field.id}`}>
+              <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {field.options?.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      
+      case "boolean":
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={field.id}
+              checked={Boolean(field.value)}
+              onCheckedChange={(checked) => handleFieldChange(field.id, checked)}
+              data-testid={`checkbox-${field.id}`}
+            />
+            <Label htmlFor={field.id}>Yes</Label>
+          </div>
+        );
+      
+      default:
+        return (
+          <Input
+            {...commonProps}
+            type="text"
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+    }
+  };
+
+  const groupedFields = formData?.fields.reduce((acc, field) => {
+    if (!acc[field.section]) {
+      acc[field.section] = [];
+    }
+    acc[field.section].push(field);
+    return acc;
+  }, {} as Record<string, DynamicField[]>) || {};
 
   if (!document || !formData) {
     return (
@@ -100,7 +208,8 @@ export default function ReviewStep({ document }: ReviewStepProps) {
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Review & Edit Extracted Data</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Verify the extracted information and make any necessary adjustments
+              Document Type: <span className="font-medium">{formData.documentType}</span> • 
+              {formData.fields.length} fields detected
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -123,214 +232,66 @@ export default function ReviewStep({ document }: ReviewStepProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 divide-x divide-gray-200 min-h-[600px]">
-        {/* Left Panel: Editable Form */}
-        <div className="p-6 space-y-6">
-          <h3 className="text-base font-semibold text-gray-900">Extracted Data</h3>
-
-          {/* Document Information */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 border-b border-gray-200 pb-2">
-              Document Information
-            </h4>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="document-type">Document Type</Label>
-                <Input
-                  id="document-type"
-                  value={formData.document.type}
-                  onChange={(e) => handleInputChange("document", "type", e.target.value)}
-                  data-testid="input-document-type"
-                />
-              </div>
-              <div>
-                <Label htmlFor="document-id">Document ID</Label>
-                <Input
-                  id="document-id"
-                  value={formData.document.id}
-                  onChange={(e) => handleInputChange("document", "id", e.target.value)}
-                  data-testid="input-document-id"
-                />
-              </div>
-              <div>
-                <Label htmlFor="issue-date">Issue Date</Label>
-                <Input
-                  id="issue-date"
-                  type="date"
-                  value={formData.document.issueDate}
-                  onChange={(e) => handleInputChange("document", "issueDate", e.target.value)}
-                  data-testid="input-issue-date"
-                />
-              </div>
-              <div>
-                <Label htmlFor="revision">Revision</Label>
-                <Input
-                  id="revision"
-                  value={formData.document.revision}
-                  onChange={(e) => handleInputChange("document", "revision", e.target.value)}
-                  data-testid="input-revision"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Product Information */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 border-b border-gray-200 pb-2">
-              Product Information
-            </h4>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="product-name">Product Name</Label>
-                <Input
-                  id="product-name"
-                  value={formData.product.name}
-                  onChange={(e) => handleInputChange("product", "name", e.target.value)}
-                  data-testid="input-product-name"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="cas-number">CAS Number</Label>
-                  <Input
-                    id="cas-number"
-                    value={formData.product.casNumber}
-                    onChange={(e) => handleInputChange("product", "casNumber", e.target.value)}
-                    data-testid="input-cas-number"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="formula">Molecular Formula</Label>
-                  <Input
-                    id="formula"
-                    value={formData.product.formula}
-                    onChange={(e) => handleInputChange("product", "formula", e.target.value)}
-                    data-testid="input-formula"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="purity">Purity</Label>
-                  <Input
-                    id="purity"
-                    value={formData.product.purity}
-                    onChange={(e) => handleInputChange("product", "purity", e.target.value)}
-                    data-testid="input-purity"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="grade">Grade</Label>
-                  <Input
-                    id="grade"
-                    value={formData.product.grade}
-                    onChange={(e) => handleInputChange("product", "grade", e.target.value)}
-                    data-testid="input-grade"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Supplier Information */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 border-b border-gray-200 pb-2">
-              Supplier Information
-            </h4>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="supplier-name">Company Name</Label>
-                <Input
-                  id="supplier-name"
-                  value={formData.supplier.name}
-                  onChange={(e) => handleInputChange("supplier", "name", e.target.value)}
-                  data-testid="input-supplier-name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="supplier-address">Contact Address</Label>
-                <Textarea
-                  id="supplier-address"
-                  rows={2}
-                  value={formData.supplier.address}
-                  onChange={(e) => handleInputChange("supplier", "address", e.target.value)}
-                  data-testid="textarea-supplier-address"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="supplier-phone">Phone</Label>
-                  <Input
-                    id="supplier-phone"
-                    value={formData.supplier.phone}
-                    onChange={(e) => handleInputChange("supplier", "phone", e.target.value)}
-                    data-testid="input-supplier-phone"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="emergency-contact">Emergency Contact</Label>
-                  <Input
-                    id="emergency-contact"
-                    value={formData.supplier.emergency}
-                    onChange={(e) => handleInputChange("supplier", "emergency", e.target.value)}
-                    data-testid="input-emergency-contact"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Hazard Classification */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 border-b border-gray-200 pb-2">
-              Hazard Classification
-            </h4>
-            
-            <div className="space-y-3">
-              {formData.hazards.map((hazard, index) => (
-                <div 
-                  key={index} 
-                  className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg"
-                >
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      placeholder="Hazard category"
-                      value={hazard.category}
-                      onChange={(e) => handleHazardChange(index, "category", e.target.value)}
-                      data-testid={`input-hazard-category-${index}`}
-                    />
-                    <Input
-                      placeholder="Signal word"
-                      value={hazard.signal}
-                      onChange={(e) => handleHazardChange(index, "signal", e.target.value)}
-                      data-testid={`input-hazard-signal-${index}`}
-                    />
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: Dynamic Form */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6">
+            <div className="space-y-8">
+              {Object.entries(groupedFields).map(([sectionName, sectionFields]) => (
+                <div key={sectionName} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium text-gray-900" data-testid={`section-${sectionName.replace(/\s+/g, '-').toLowerCase()}`}>
+                      {sectionName}
+                    </h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addField(sectionName)}
+                      data-testid={`button-add-field-${sectionName.replace(/\s+/g, '-').toLowerCase()}`}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Field
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeHazard(index)}
-                    className="ml-3 text-red-400 hover:text-red-600"
-                    data-testid={`button-remove-hazard-${index}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {sectionFields.map((field) => (
+                      <div key={field.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={field.id} className="text-sm font-medium">
+                            {field.label}
+                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                          </Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeField(field.id)}
+                            className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                            data-testid={`button-remove-${field.id}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        {renderField(field)}
+                        <div className="text-xs text-gray-500">
+                          Type: {field.type}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
-              
+            </div>
+
+            {/* Add New Section */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
               <Button
-                type="button"
                 variant="outline"
-                onClick={addHazard}
-                className="w-full"
-                data-testid="button-add-hazard"
+                onClick={() => addField("New Section")}
+                data-testid="button-add-new-section"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Hazard Classification
+                Add New Section
               </Button>
             </div>
           </div>

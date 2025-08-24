@@ -27,34 +27,33 @@ export const settings = pgTable("settings", {
   connectionStatus: text("connection_status").default("untested"),
 });
 
-// Document schemas
-export const hazardSchema = z.object({
-  category: z.string(),
-  signal: z.string(),
-  pictogram: z.string().optional(),
+// Dynamic field schema for flexible document structure
+export const dynamicFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  value: z.string().or(z.number()).or(z.boolean()).or(z.null()),
+  type: z.enum(['text', 'number', 'date', 'email', 'phone', 'textarea', 'select', 'boolean']),
+  section: z.string(),
+  required: z.boolean().default(false),
+  options: z.array(z.string()).optional(), // For select fields
+  validation: z.object({
+    pattern: z.string().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+    message: z.string().optional(),
+  }).optional(),
 });
 
 export const extractedDataSchema = z.object({
-  document: z.object({
-    type: z.string(),
-    id: z.string(),
-    issueDate: z.string(),
-    revision: z.string(),
-  }),
-  product: z.object({
-    name: z.string(),
-    casNumber: z.string(),
-    formula: z.string(),
-    purity: z.string(),
-    grade: z.string(),
-  }),
-  supplier: z.object({
-    name: z.string(),
-    address: z.string(),
-    phone: z.string(),
-    emergency: z.string(),
-  }),
-  hazards: z.array(hazardSchema),
+  documentType: z.string(),
+  detectedSections: z.array(z.string()),
+  fields: z.array(dynamicFieldSchema),
+  metadata: z.object({
+    originalFileName: z.string().optional(),
+    extractedAt: z.string().optional(),
+    confidence: z.number().optional(),
+    totalFields: z.number().optional(),
+  }).optional(),
 });
 
 export const insertDocumentSchema = createInsertSchema(documents).omit({
@@ -71,7 +70,7 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
 export type ExtractedData = z.infer<typeof extractedDataSchema>;
-export type Hazard = z.infer<typeof hazardSchema>;
+export type DynamicField = z.infer<typeof dynamicFieldSchema>;
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type User = typeof users.$inferSelect;

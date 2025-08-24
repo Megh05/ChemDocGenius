@@ -1,4 +1,4 @@
-import { Settings, ExtractedData, extractedDataSchema } from "@shared/schema";
+import { Settings, ExtractedData, extractedDataSchema, DynamicField } from "@shared/schema";
 import fs from "fs";
 import pdf from "pdf-parse";
 
@@ -67,36 +67,57 @@ export class MistralService {
     const apiKey = this.getApiKey(settings);
     
     const prompt = `
-Extract the following information from this chemical document text and return it as a JSON object:
+You are an intelligent document analysis system. Analyze this document and:
 
-Required structure:
+1. Identify the document type (e.g., Certificate of Analysis, Safety Data Sheet, Product Specification, etc.)
+2. Detect all sections and meaningful data points
+3. Extract all key-value pairs found in the document
+4. Determine appropriate form field types for each data point
+5. Group related fields into logical sections
+
+For each extracted field, determine:
+- Appropriate input type (text, number, date, email, phone, textarea, select, boolean)
+- Whether the field should be required
+- Validation rules if applicable
+
+Return a JSON object with this exact structure:
 {
-  "document": {
-    "type": "document type (e.g., Safety Data Sheet)",
-    "id": "document ID or number",
-    "issueDate": "issue date in YYYY-MM-DD format",
-    "revision": "revision number or version"
-  },
-  "product": {
-    "name": "chemical product name",
-    "casNumber": "CAS registry number",
-    "formula": "chemical formula",
-    "purity": "purity percentage or grade",
-    "grade": "chemical grade (e.g., ACS, Technical)"
-  },
-  "supplier": {
-    "name": "supplier company name",
-    "address": "full address",
-    "phone": "phone number",
-    "emergency": "emergency contact number"
-  },
-  "hazards": [
+  "documentType": "detected document type",
+  "detectedSections": ["section1", "section2", "section3"],
+  "fields": [
     {
-      "category": "hazard classification",
-      "signal": "signal word (Danger/Warning)"
+      "id": "unique_field_id",
+      "label": "Human readable field name",
+      "value": "extracted value or null",
+      "type": "text|number|date|email|phone|textarea|select|boolean",
+      "section": "section name this field belongs to",
+      "required": true/false,
+      "options": ["option1", "option2"] // only for select fields
     }
-  ]
+  ],
+  "metadata": {
+    "extractedAt": "${new Date().toISOString()}",
+    "confidence": 0.85,
+    "totalFields": "number of fields extracted"
+  }
 }
+
+Be intelligent about field types:
+- Use "number" for quantities, percentages, measurements
+- Use "date" for dates
+- Use "email" for email addresses
+- Use "phone" for phone numbers
+- Use "textarea" for long descriptions
+- Use "select" when you can infer possible options
+- Use "boolean" for yes/no fields
+- Use "text" as default
+
+Extract ALL meaningful data points, not just chemical data. Include:
+- Company information (names, addresses, contacts)
+- Product details (names, specifications, properties)
+- Test results and measurements
+- Dates and reference numbers
+- Any other structured data found
 
 Document text:
 ${text}
@@ -119,7 +140,7 @@ Return only the JSON object, no additional text:`;
             }
           ],
           temperature: 0.1,
-          max_tokens: 2000
+          max_tokens: 4000
         })
       });
 
@@ -140,32 +161,40 @@ Return only the JSON object, no additional text:`;
         throw new Error("No valid JSON found in response");
       }
 
-      return JSON.parse(jsonMatch[0]);
+      const parsedData = JSON.parse(jsonMatch[0]);
+      
+      // Ensure all fields have unique IDs
+      if (parsedData.fields) {
+        parsedData.fields.forEach((field: any, index: number) => {
+          if (!field.id) {
+            field.id = `field_${index + 1}`;
+          }
+        });
+      }
+      
+      return parsedData;
     } catch (error) {
       console.error("Mistral API call failed:", error);
       
-      // Fallback: return default structure if API fails
+      // Fallback: return basic structure if API fails
       return {
-        document: {
-          type: "Safety Data Sheet",
-          id: "Unknown",
-          issueDate: new Date().toISOString().split('T')[0],
-          revision: "1.0"
-        },
-        product: {
-          name: "Chemical Product",
-          casNumber: "Unknown",
-          formula: "Unknown",
-          purity: "Unknown",
-          grade: "Unknown"
-        },
-        supplier: {
-          name: "Unknown Supplier",
-          address: "Address not available",
-          phone: "Phone not available",
-          emergency: "Emergency contact not available"
-        },
-        hazards: []
+        documentType: "Unknown Document",
+        detectedSections: ["General Information"],
+        fields: [
+          {
+            id: "document_title",
+            label: "Document Title",
+            value: "Untitled Document",
+            type: "text",
+            section: "General Information",
+            required: false
+          }
+        ],
+        metadata: {
+          extractedAt: new Date().toISOString(),
+          confidence: 0.1,
+          totalFields: 1
+        }
       };
     }
   }
