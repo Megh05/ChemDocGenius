@@ -412,18 +412,67 @@ Return only the JSON object with populated detectedSections and fields:`;
     // Ensure detectedSections are objects with required properties
     if (transformed.detectedSections && Array.isArray(transformed.detectedSections)) {
       transformed.detectedSections = transformed.detectedSections.map((section: any, index: number) => {
+        let transformedSection;
+        
         if (typeof section === 'string') {
-          return {
+          transformedSection = {
             id: `section_${index + 1}`,
             title: section,
-            content: `Content for ${section}`
+            content: `Content for ${section}`,
+            type: 'field_group',
+            preview: `Section: ${section}`,
+            fields: [],
+            selected: false,
+            order: index + 1
+          };
+        } else {
+          transformedSection = {
+            id: section.id || `section_${index + 1}`,
+            title: section.title || section.name || `Section ${index + 1}`,
+            content: section.content || section.description || '',
+            type: section.type || 'field_group',
+            preview: section.preview || `${section.title || 'Section'} - ${section.fields?.length || 0} fields`,
+            fields: [],
+            selected: section.selected || false,
+            order: section.order || index + 1
           };
         }
-        return {
-          id: section.id || `section_${index + 1}`,
-          title: section.title || section.name || `Section ${index + 1}`,
-          content: section.content || section.description || ''
-        };
+
+        // Transform fields within sections - convert strings to field objects
+        if (section.fields && Array.isArray(section.fields)) {
+          transformedSection.fields = section.fields.map((field: any, fieldIndex: number) => {
+            if (typeof field === 'string') {
+              // Convert string to field object
+              return {
+                id: `${transformedSection.id}_field_${fieldIndex + 1}`,
+                label: field,
+                value: '',
+                type: 'text',
+                section: transformedSection.id
+              };
+            } else {
+              // Transform existing field object
+              let value = field.value;
+              if (typeof value === 'object' && value !== null) {
+                if (Array.isArray(value)) {
+                  value = value.join(', ');
+                } else {
+                  value = JSON.stringify(value);
+                }
+              }
+              
+              return {
+                id: field.id || `${transformedSection.id}_field_${fieldIndex + 1}`,
+                label: field.label || field.name || `Field ${fieldIndex + 1}`,
+                value: String(value || ''),
+                type: field.type || 'text',
+                section: transformedSection.id
+              };
+            }
+          });
+        }
+
+        return transformedSection;
       });
     }
 
