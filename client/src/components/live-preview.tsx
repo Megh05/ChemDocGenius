@@ -1,5 +1,4 @@
 import { FileText, Eye } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExtractedData, DynamicField } from "@shared/schema";
 
 interface LivePreviewProps {
@@ -27,12 +26,12 @@ export default function LivePreview({ data }: LivePreviewProps) {
     const tableData = field.value as string[][] || [["Header"], ["Data"]];
     
     return (
-      <div className="overflow-x-auto mb-4">
-        <table className="w-full border-collapse border border-gray-300 bg-white">
+      <div className="mb-6">
+        <table className="w-full border-collapse border border-black">
           <thead>
-            <tr className="bg-blue-100">
+            <tr>
               {tableData[0]?.map((header, colIndex) => (
-                <th key={colIndex} className="border border-gray-300 p-3 text-left font-semibold text-blue-900">
+                <th key={colIndex} className="border border-black p-2 text-left font-bold text-black bg-gray-100">
                   {header}
                 </th>
               ))}
@@ -40,9 +39,9 @@ export default function LivePreview({ data }: LivePreviewProps) {
           </thead>
           <tbody>
             {tableData.slice(1).map((row, rowIndex) => (
-              <tr key={rowIndex} className={rowIndex % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+              <tr key={rowIndex}>
                 {row.map((cell, colIndex) => (
-                  <td key={colIndex} className="border border-gray-300 p-3 text-gray-900">
+                  <td key={colIndex} className="border border-black p-2 text-black">
                     {cell || "-"}
                   </td>
                 ))}
@@ -57,12 +56,12 @@ export default function LivePreview({ data }: LivePreviewProps) {
   const renderHeading = (field: DynamicField) => {
     const level = field.layout?.level || 2;
     const classes = {
-      1: "text-3xl font-bold text-blue-900 mb-4 border-b-2 border-blue-300 pb-2",
-      2: "text-2xl font-bold text-blue-800 mb-3 border-b border-blue-200 pb-1",
-      3: "text-xl font-semibold text-blue-700 mb-2",
-      4: "text-lg font-semibold text-blue-600 mb-2",
-      5: "text-base font-semibold text-blue-500 mb-1",
-      6: "text-sm font-semibold text-blue-400 mb-1"
+      1: "text-2xl font-bold text-black mb-3 border-b-2 border-black pb-1",
+      2: "text-xl font-bold text-black mb-2 border-b border-black pb-1",
+      3: "text-lg font-semibold text-black mb-2",
+      4: "text-base font-semibold text-black mb-1",
+      5: "text-sm font-semibold text-black mb-1",
+      6: "text-sm font-medium text-black mb-1"
     };
 
     return (
@@ -74,7 +73,7 @@ export default function LivePreview({ data }: LivePreviewProps) {
 
   const renderParagraph = (field: DynamicField) => {
     return (
-      <p className="text-gray-900 mb-4 leading-relaxed">
+      <p className="text-black mb-3 leading-relaxed text-justify">
         {field.value?.toString() || ""}
       </p>
     );
@@ -83,41 +82,35 @@ export default function LivePreview({ data }: LivePreviewProps) {
   const renderRegularField = (field: DynamicField) => {
     const formatFieldValue = (field: DynamicField) => {
       if (field.value === null || field.value === undefined || field.value === "") {
-        return <span className="text-gray-400 italic">Not specified</span>;
+        return <span className="text-gray-600 italic">Not specified</span>;
       }
 
       switch (field.type) {
         case "boolean":
-          return <span className={field.value ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
-            {field.value ? "✓ Yes" : "✗ No"}
+          return <span className="font-medium text-black">
+            {field.value ? "Yes" : "No"}
           </span>;
         case "date":
-          return field.value ? new Date(field.value.toString()).toLocaleDateString() : "Not specified";
+          return <span className="text-black">{field.value ? new Date(field.value.toString()).toLocaleDateString() : "Not specified"}</span>;
         case "number":
-          return <span className="font-mono font-semibold">{field.value}</span>;
+          return <span className="font-mono text-black">{field.value}</span>;
         case "email":
-          return <a href={`mailto:${field.value}`} className="text-blue-600 hover:underline">
-            {field.value}
-          </a>;
+          return <span className="text-black underline">{field.value}</span>;
         case "phone":
-          return <a href={`tel:${field.value}`} className="text-blue-600 hover:underline">
-            {field.value}
-          </a>;
+          return <span className="text-black font-mono">{field.value}</span>;
         default:
-          return <span className="font-medium">{field.value.toString()}</span>;
+          return <span className="text-black">{field.value.toString()}</span>;
       }
     };
 
     return (
-      <div className="mb-3">
-        <div className="grid grid-cols-3 gap-4">
-          <dt className="text-sm font-semibold text-blue-800 uppercase tracking-wide">
-            {field.label}:
-          </dt>
-          <dd className="col-span-2 text-sm text-gray-900">
-            {formatFieldValue(field)}
-          </dd>
-        </div>
+      <div className="mb-2 grid grid-cols-5 gap-4">
+        <dt className="col-span-2 text-sm font-semibold text-black uppercase tracking-wide">
+          {field.label}:
+        </dt>
+        <dd className="col-span-3 text-sm text-black">
+          {formatFieldValue(field)}
+        </dd>
       </div>
     );
   };
@@ -127,7 +120,7 @@ export default function LivePreview({ data }: LivePreviewProps) {
       case "table":
         return (
           <div key={field.id} className="mb-6">
-            <h4 className="text-lg font-semibold text-blue-800 mb-3">{field.label}</h4>
+            <h4 className="text-base font-bold text-black mb-2 border-b border-black pb-1">{field.label}</h4>
             {renderTable(field)}
           </div>
         );
@@ -154,119 +147,75 @@ export default function LivePreview({ data }: LivePreviewProps) {
 
   return (
     <div className="w-1/2 border-l border-gray-200 bg-gray-50">
-      <div className="p-6 border-b border-gray-200 bg-white">
+      <div className="p-4 border-b border-gray-200 bg-white">
         <div className="flex items-center space-x-2">
-          <Eye className="w-5 h-5 text-blue-600" />
+          <Eye className="w-5 h-5 text-gray-600" />
           <h3 className="text-lg font-medium text-gray-900">Live Preview</h3>
         </div>
         <p className="text-sm text-gray-600 mt-1">
-          Preview with original document structure preserved
+          Professional A4 format ready for letterhead printing
         </p>
       </div>
 
       <div className="p-6 overflow-y-auto h-full">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
-          {/* Document Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">NTCB Certificate of Analysis</h1>
-                <p className="text-blue-100 mt-1">
-                  Document Type: {data.documentType}
-                </p>
+        <div className="max-w-none mx-auto bg-white shadow-lg" style={{ 
+          width: '210mm', 
+          minHeight: '297mm', 
+          padding: '20mm',
+          margin: '0 auto',
+          fontFamily: 'serif'
+        }}>
+          
+          {/* Professional Header */}
+          <div className="border-b-2 border-black pb-4 mb-6">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-black mb-2">CERTIFICATE OF ANALYSIS</h1>
+              <div className="text-lg text-black font-semibold">
+                Nano Tech Chemical Brothers Pvt. Ltd.
               </div>
-              <FileText className="w-8 h-8 text-blue-200" />
             </div>
             
-            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-black">
               <div>
-                <span className="text-blue-200">Generated:</span>
-                <span className="ml-2">{new Date().toLocaleDateString()}</span>
+                <strong>Generated:</strong> {new Date().toLocaleDateString()}
               </div>
               <div>
-                <span className="text-blue-200">Elements:</span>
-                <span className="ml-2">{data.fields.length}</span>
+                <strong>Document Type:</strong> {data.documentType}
               </div>
             </div>
           </div>
 
           {/* Document Content with Preserved Structure */}
-          <div className="p-6">
+          <div className="space-y-6">
             {Object.entries(groupedFields).map(([sectionName, sectionFields]) => (
-              <div key={sectionName} className="mb-8">
-                <h2 className="text-xl font-bold text-blue-800 border-b-2 border-blue-200 pb-2 mb-6">
-                  {sectionName.toUpperCase()}
+              <div key={sectionName} className="mb-6">
+                <h2 className="text-lg font-bold text-black border-b border-black pb-1 mb-4 uppercase">
+                  {sectionName}
                 </h2>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {sectionFields.map((field) => renderField(field))}
                 </div>
               </div>
             ))}
-
-            {/* Structure Info */}
-            {data.structure && (
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-semibold text-blue-800 mb-3">Document Structure</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <span className={`w-3 h-3 rounded-full ${data.structure.hasTables ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                    <span>Tables: {data.structure.hasTables ? 'Yes' : 'No'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`w-3 h-3 rounded-full ${data.structure.hasHeaders ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                    <span>Headers: {data.structure.hasHeaders ? 'Yes' : 'No'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`w-3 h-3 rounded-full ${data.structure.hasLists ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                    <span>Lists: {data.structure.hasLists ? 'Yes' : 'No'}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Metadata Section */}
-            {data.metadata && (
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-semibold text-blue-800 mb-3">Processing Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  {data.metadata.extractedAt && (
-                    <div>
-                      <dt className="font-medium text-gray-700">Extracted At:</dt>
-                      <dd className="text-gray-900 mt-1">
-                        {new Date(data.metadata.extractedAt).toLocaleString()}
-                      </dd>
-                    </div>
-                  )}
-                  {data.metadata.confidence && (
-                    <div>
-                      <dt className="font-medium text-gray-700">Confidence Score:</dt>
-                      <dd className="text-gray-900 mt-1">
-                        <span className={`font-semibold ${
-                          data.metadata.confidence > 0.8 ? 'text-green-600' :
-                          data.metadata.confidence > 0.6 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {(data.metadata.confidence * 100).toFixed(1)}%
-                        </span>
-                      </dd>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <div>
-                <span className="font-medium">Nano Tech Chemical Brothers Pvt. Ltd.</span>
+          {/* Professional Footer */}
+          <div className="border-t-2 border-black pt-4 mt-8">
+            <div className="text-center text-sm text-black">
+              <div className="font-bold mb-1">NANO TECH CHEMICAL BROTHERS PVT. LTD.</div>
+              <div className="text-xs">
+                This document was generated automatically from supplier documentation.
               </div>
-              <div>
-                Generated by ChemDoc Processor
+              <div className="text-xs mt-1">
+                Document generated on {new Date().toLocaleDateString()} • Confidential & Proprietary
               </div>
             </div>
+          </div>
+
+          {/* Page break indicator for multiple pages */}
+          <div className="mt-8 text-center text-xs text-gray-400 border-t border-gray-300 pt-2">
+            Ready for A4 Letterhead Printing
           </div>
         </div>
       </div>
