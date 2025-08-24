@@ -27,12 +27,12 @@ export const settings = pgTable("settings", {
   connectionStatus: text("connection_status").default("untested"),
 });
 
-// Dynamic field schema for flexible document structure
+// Dynamic field schema for flexible document structure with layout preservation
 export const dynamicFieldSchema = z.object({
   id: z.string(),
   label: z.string(),
-  value: z.string().or(z.number()).or(z.boolean()).or(z.null()),
-  type: z.enum(['text', 'number', 'date', 'email', 'phone', 'textarea', 'select', 'boolean']),
+  value: z.string().or(z.number()).or(z.boolean()).or(z.null()).or(z.array(z.array(z.string()))), // Support table data
+  type: z.enum(['text', 'number', 'date', 'email', 'phone', 'textarea', 'select', 'boolean', 'table', 'heading', 'paragraph']),
   section: z.string(),
   required: z.boolean().default(false),
   options: z.array(z.string()).optional(), // For select fields
@@ -42,12 +42,33 @@ export const dynamicFieldSchema = z.object({
     max: z.number().optional(),
     message: z.string().optional(),
   }).optional(),
+  // Layout and structure properties
+  layout: z.object({
+    structureType: z.enum(['field', 'table', 'heading', 'paragraph', 'list']).default('field'),
+    level: z.number().optional(), // For headings (1-6)
+    columns: z.array(z.string()).optional(), // For table headers
+    rows: z.array(z.array(z.string())).optional(), // For table data
+    order: z.number().default(0), // To maintain original order
+    colspan: z.number().optional(),
+    rowspan: z.number().optional(),
+  }).optional(),
 });
 
 export const extractedDataSchema = z.object({
   documentType: z.string(),
   detectedSections: z.array(z.string()),
   fields: z.array(dynamicFieldSchema),
+  structure: z.object({
+    hasHeaders: z.boolean().default(false),
+    hasTables: z.boolean().default(false),
+    hasLists: z.boolean().default(false),
+    originalLayout: z.array(z.object({
+      type: z.enum(['heading', 'paragraph', 'table', 'list', 'field']),
+      content: z.string(),
+      level: z.number().optional(),
+      order: z.number(),
+    })).optional(),
+  }).optional(),
   metadata: z.object({
     originalFileName: z.string().optional(),
     extractedAt: z.string().optional(),

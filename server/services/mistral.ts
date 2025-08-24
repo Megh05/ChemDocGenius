@@ -67,62 +67,88 @@ export class MistralService {
     const apiKey = this.getApiKey(settings);
     
     const prompt = `
-You are an intelligent document analysis system. Analyze this document and:
+You are an advanced document structure analysis system. Analyze this document and PRESERVE its original layout structure including tables, headings, paragraphs, and visual formatting.
 
-1. Identify the document type (e.g., Certificate of Analysis, Safety Data Sheet, Product Specification, etc.)
-2. Detect all sections and meaningful data points
-3. Extract all key-value pairs found in the document
-4. Determine appropriate form field types for each data point
-5. Group related fields into logical sections
+Your tasks:
+1. Identify the document type
+2. Detect ALL structural elements: headings, tables, paragraphs, lists
+3. Extract data while maintaining the original visual structure
+4. For tables: preserve headers, rows, and cell relationships
+5. For headings: identify hierarchy levels (1-6)
+6. Maintain the exact order of elements as they appear
 
-For each extracted field, determine:
-- Appropriate input type (text, number, date, email, phone, textarea, select, boolean)
-- Whether the field should be required
-- Validation rules if applicable
-
-Return a JSON object with this exact structure:
+RETURN THIS EXACT JSON STRUCTURE:
 {
   "documentType": "detected document type",
-  "detectedSections": ["section1", "section2", "section3"],
+  "detectedSections": ["section1", "section2"],
   "fields": [
     {
-      "id": "unique_field_id",
-      "label": "Human readable field name",
-      "value": "extracted value or null",
-      "type": "text|number|date|email|phone|textarea|select|boolean",
-      "section": "section name this field belongs to",
-      "required": true/false,
-      "options": ["option1", "option2"] // only for select fields
+      "id": "unique_id",
+      "label": "field name or table/heading title",
+      "value": "single value OR [['header1','header2'],['row1col1','row1col2']] for tables",
+      "type": "text|number|date|email|phone|textarea|table|heading|paragraph",
+      "section": "section name",
+      "required": false,
+      "layout": {
+        "structureType": "field|table|heading|paragraph",
+        "level": 1, // for headings only (1-6)
+        "columns": ["header1", "header2"], // for tables only
+        "rows": [["row1col1","row1col2"],["row2col1","row2col2"]], // for tables only
+        "order": 1 // sequential order in document
+      }
     }
   ],
+  "structure": {
+    "hasHeaders": true/false,
+    "hasTables": true/false,
+    "hasLists": true/false,
+    "originalLayout": [
+      {
+        "type": "heading|paragraph|table|field",
+        "content": "text content or table identifier",
+        "level": 1, // for headings
+        "order": 1
+      }
+    ]
+  },
   "metadata": {
     "extractedAt": "${new Date().toISOString()}",
     "confidence": 0.85,
-    "totalFields": "number of fields extracted"
+    "totalFields": 10
   }
 }
 
-Be intelligent about field types:
-- Use "number" for quantities, percentages, measurements
-- Use "date" for dates
-- Use "email" for email addresses
-- Use "phone" for phone numbers
-- Use "textarea" for long descriptions
-- Use "select" when you can infer possible options
-- Use "boolean" for yes/no fields
-- Use "text" as default
+CRITICAL RULES:
+- For TABLES: Use type="table", value must be array of arrays [[headers],[row1],[row2]]
+- For HEADINGS: Use type="heading", set layout.level (1-6), preserve hierarchy
+- For regular fields: Use appropriate type (text, number, date, etc.)
+- MAINTAIN EXACT ORDER: layout.order must reflect document sequence
+- PRESERVE STRUCTURE: Don't flatten tables into individual fields
 
-Extract ALL meaningful data points, not just chemical data. Include:
-- Company information (names, addresses, contacts)
-- Product details (names, specifications, properties)
-- Test results and measurements
-- Dates and reference numbers
-- Any other structured data found
+EXAMPLE TABLE EXTRACTION:
+If you see:
+Test Items | Specifications | Results
+Appearance | White powder | White powder
+Purity | ≥95% | 97.4%
+
+Extract as:
+{
+  "id": "test_results_table",
+  "label": "Test Results",
+  "value": [["Test Items","Specifications","Results"],["Appearance","White powder","White powder"],["Purity","≥95%","97.4%"]],
+  "type": "table",
+  "layout": {
+    "structureType": "table",
+    "columns": ["Test Items","Specifications","Results"],
+    "rows": [["Appearance","White powder","White powder"],["Purity","≥95%","97.4%"]],
+    "order": 5
+  }
+}
 
 Document text:
 ${text}
 
-Return only the JSON object, no additional text:`;
+Return only the JSON object:`;
 
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {

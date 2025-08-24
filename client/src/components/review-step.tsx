@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RotateCcw, Plus, X, Save } from "lucide-react";
+import { RotateCcw, Plus, X, Save, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +36,7 @@ export default function ReviewStep({ document }: ReviewStepProps) {
     },
   });
 
-  const handleFieldChange = (fieldId: string, value: string | number | boolean) => {
+  const handleFieldChange = (fieldId: string, value: string | number | boolean | string[][]) => {
     if (!formData) return;
     
     setFormData(prev => ({
@@ -44,6 +44,56 @@ export default function ReviewStep({ document }: ReviewStepProps) {
       fields: prev!.fields.map(field => 
         field.id === fieldId ? { ...field, value } : field
       )
+    }));
+  };
+
+  const handleTableCellChange = (fieldId: string, rowIndex: number, colIndex: number, value: string) => {
+    if (!formData) return;
+    
+    setFormData(prev => ({
+      ...prev!,
+      fields: prev!.fields.map(field => {
+        if (field.id === fieldId && Array.isArray(field.value)) {
+          const newTable = [...field.value as string[][]];
+          newTable[rowIndex][colIndex] = value;
+          return { ...field, value: newTable };
+        }
+        return field;
+      })
+    }));
+  };
+
+  const addTableRow = (fieldId: string) => {
+    if (!formData) return;
+    
+    setFormData(prev => ({
+      ...prev!,
+      fields: prev!.fields.map(field => {
+        if (field.id === fieldId && Array.isArray(field.value)) {
+          const table = field.value as string[][];
+          const columnCount = table[0]?.length || 2;
+          const newRow = new Array(columnCount).fill("");
+          return { ...field, value: [...table, newRow] };
+        }
+        return field;
+      })
+    }));
+  };
+
+  const removeTableRow = (fieldId: string, rowIndex: number) => {
+    if (!formData) return;
+    
+    setFormData(prev => ({
+      ...prev!,
+      fields: prev!.fields.map(field => {
+        if (field.id === fieldId && Array.isArray(field.value)) {
+          const table = field.value as string[][];
+          // Don't remove if it's the header row or the only row
+          if (rowIndex === 0 || table.length <= 2) return field;
+          return { ...field, value: table.filter((_, index) => index !== rowIndex) };
+        }
+        return field;
+      })
     }));
   };
 
@@ -81,7 +131,104 @@ export default function ReviewStep({ document }: ReviewStepProps) {
     }
   };
 
+  const renderTableField = (field: DynamicField) => {
+    const tableData = field.value as string[][] || [["Header"], ["Data"]];
+    
+    return (
+      <div className="space-y-2">
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-50">
+                {tableData[0]?.map((header, colIndex) => (
+                  <th key={colIndex} className="border border-gray-300 p-2 text-left">
+                    <Input
+                      value={header}
+                      onChange={(e) => handleTableCellChange(field.id, 0, colIndex, e.target.value)}
+                      className="border-0 bg-transparent font-medium"
+                      data-testid={`table-header-${field.id}-${colIndex}`}
+                    />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.slice(1).map((row, rowIndex) => (
+                <tr key={rowIndex + 1}>
+                  {row.map((cell, colIndex) => (
+                    <td key={colIndex} className="border border-gray-300 p-2">
+                      <Input
+                        value={cell}
+                        onChange={(e) => handleTableCellChange(field.id, rowIndex + 1, colIndex, e.target.value)}
+                        className="border-0 bg-transparent"
+                        data-testid={`table-cell-${field.id}-${rowIndex}-${colIndex}`}
+                      />
+                    </td>
+                  ))}
+                  <td className="border border-gray-300 p-2 w-10">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeTableRow(field.id, rowIndex + 1)}
+                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                      data-testid={`button-remove-row-${field.id}-${rowIndex}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => addTableRow(field.id)}
+          data-testid={`button-add-row-${field.id}`}
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Add Row
+        </Button>
+      </div>
+    );
+  };
+
   const renderField = (field: DynamicField) => {
+    if (field.type === "table") {
+      return renderTableField(field);
+    }
+
+    if (field.type === "heading") {
+      const HeadingTag = `h${field.layout?.level || 2}` as keyof JSX.IntrinsicElements;
+      return (
+        <div className="space-y-2">
+          <Input
+            value={field.value?.toString() || ""}
+            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+            className="font-bold text-lg border-2 border-blue-200"
+            placeholder="Heading text"
+            data-testid={`heading-${field.id}`}
+          />
+          <div className="text-xs text-gray-500">
+            Heading Level {field.layout?.level || 2}
+          </div>
+        </div>
+      );
+    }
+
+    if (field.type === "paragraph") {
+      return (
+        <Textarea
+          value={field.value?.toString() || ""}
+          onChange={(e) => handleFieldChange(field.id, e.target.value)}
+          className="min-h-[100px]"
+          placeholder="Paragraph content"
+          data-testid={`paragraph-${field.id}`}
+        />
+      );
+    }
+
     const commonProps = {
       id: field.id,
       value: field.value?.toString() || "",
@@ -182,13 +329,20 @@ export default function ReviewStep({ document }: ReviewStepProps) {
     }
   };
 
-  const groupedFields = formData?.fields.reduce((acc, field) => {
+  // Sort fields by order to maintain document structure
+  const sortedFields = formData?.fields.sort((a, b) => {
+    const orderA = a.layout?.order || 0;
+    const orderB = b.layout?.order || 0;
+    return orderA - orderB;
+  }) || [];
+
+  const groupedFields = sortedFields.reduce((acc, field) => {
     if (!acc[field.section]) {
       acc[field.section] = [];
     }
     acc[field.section].push(field);
     return acc;
-  }, {} as Record<string, DynamicField[]>) || {};
+  }, {} as Record<string, DynamicField[]>);
 
   if (!document || !formData) {
     return (
@@ -209,7 +363,9 @@ export default function ReviewStep({ document }: ReviewStepProps) {
             <h2 className="text-lg font-semibold text-gray-900">Review & Edit Extracted Data</h2>
             <p className="text-sm text-gray-600 mt-1">
               Document Type: <span className="font-medium">{formData.documentType}</span> • 
-              {formData.fields.length} fields detected
+              {formData.fields.length} elements • 
+              {formData.structure?.hasTables ? "📊 Tables" : ""} 
+              {formData.structure?.hasHeaders ? " 📝 Headers" : ""}
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -233,7 +389,7 @@ export default function ReviewStep({ document }: ReviewStepProps) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel: Dynamic Form */}
+        {/* Left Panel: Dynamic Form with Preserved Structure */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">
             <div className="space-y-8">
@@ -254,11 +410,14 @@ export default function ReviewStep({ document }: ReviewStepProps) {
                     </Button>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-6">
                     {sectionFields.map((field) => (
                       <div key={field.id} className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor={field.id} className="text-sm font-medium">
+                          <Label htmlFor={field.id} className="text-sm font-medium flex items-center gap-2">
+                            {field.type === "table" && "📊"}
+                            {field.type === "heading" && "📝"}
+                            {field.type === "paragraph" && "📄"}
                             {field.label}
                             {field.required && <span className="text-red-500 ml-1">*</span>}
                           </Label>
@@ -274,7 +433,7 @@ export default function ReviewStep({ document }: ReviewStepProps) {
                         </div>
                         {renderField(field)}
                         <div className="text-xs text-gray-500">
-                          Type: {field.type}
+                          Type: {field.type} • Order: {field.layout?.order || 0}
                         </div>
                       </div>
                     ))}

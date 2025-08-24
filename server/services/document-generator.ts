@@ -44,7 +44,7 @@ export class DocumentGenerator {
 
         let yPosition = 120;
 
-        // Dynamic Sections
+        // Dynamic Sections with Structure Preservation
         Object.entries(groupedFields).forEach(([sectionName, sectionFields]) => {
           // Check if we need a new page
           if (yPosition > 700) {
@@ -56,28 +56,92 @@ export class DocumentGenerator {
           doc.fontSize(14).fillColor('#1E40AF').text(sectionName.toUpperCase(), 50, yPosition);
           yPosition += 25;
           
-          // Section Fields
-          sectionFields.forEach((field: DynamicField) => {
+          // Sort fields by order to maintain structure
+          const sortedFields = sectionFields.sort((a, b) => {
+            const orderA = a.layout?.order || 0;
+            const orderB = b.layout?.order || 0;
+            return orderA - orderB;
+          });
+          
+          // Render fields preserving original structure
+          sortedFields.forEach((field: DynamicField) => {
             if (yPosition > 750) {
               doc.addPage();
               yPosition = 50;
             }
             
-            doc.fontSize(10).fillColor('#000000');
-            const value = field.value?.toString() || 'Not specified';
-            const label = `${field.label}:`;
-            
-            // Handle different field types
-            let displayValue = value;
-            if (field.type === 'boolean') {
-              displayValue = field.value ? 'Yes' : 'No';
-            } else if (field.type === 'date' && field.value) {
-              displayValue = new Date(field.value.toString()).toLocaleDateString();
+            switch (field.type) {
+              case 'table':
+                // Render table structure
+                const tableData = field.value as string[][] || [["Header"], ["Data"]];
+                
+                // Table title
+                doc.fontSize(12).fillColor('#1E40AF').text(field.label, 50, yPosition);
+                yPosition += 20;
+                
+                // Table headers
+                let xPosition = 50;
+                const columnWidth = 150;
+                
+                doc.fontSize(10).fillColor('#000000');
+                
+                // Draw table border and headers
+                if (tableData[0]) {
+                  tableData[0].forEach((header, colIndex) => {
+                    doc.rect(xPosition, yPosition, columnWidth, 20).stroke();
+                    doc.text(header, xPosition + 5, yPosition + 5);
+                    xPosition += columnWidth;
+                  });
+                  yPosition += 20;
+                }
+                
+                // Draw table rows
+                tableData.slice(1).forEach((row) => {
+                  xPosition = 50;
+                  row.forEach((cell, colIndex) => {
+                    doc.rect(xPosition, yPosition, columnWidth, 15).stroke();
+                    doc.text(cell || '-', xPosition + 5, yPosition + 3);
+                    xPosition += columnWidth;
+                  });
+                  yPosition += 15;
+                });
+                
+                yPosition += 20;
+                break;
+                
+              case 'heading':
+                const level = field.layout?.level || 2;
+                const fontSize = Math.max(16 - level, 10);
+                doc.fontSize(fontSize).fillColor('#1E40AF').text(field.value?.toString() || field.label, 50, yPosition);
+                yPosition += fontSize + 10;
+                break;
+                
+              case 'paragraph':
+                doc.fontSize(10).fillColor('#000000');
+                const text = field.value?.toString() || '';
+                const lines = doc.heightOfString(text, { width: 500 });
+                doc.text(text, 50, yPosition, { width: 500 });
+                yPosition += lines + 10;
+                break;
+                
+              default:
+                // Regular field
+                doc.fontSize(10).fillColor('#000000');
+                const value = field.value?.toString() || 'Not specified';
+                const label = `${field.label}:`;
+                
+                let displayValue = value;
+                if (field.type === 'boolean') {
+                  displayValue = field.value ? 'Yes' : 'No';
+                } else if (field.type === 'date' && field.value) {
+                  displayValue = new Date(field.value.toString()).toLocaleDateString();
+                }
+                
+                doc.text(label, 50, yPosition);
+                doc.text(displayValue, 200, yPosition);
+                yPosition += 15;
+                break;
             }
-            
-            doc.text(label, 50, yPosition);
-            doc.text(displayValue, 200, yPosition);
-            yPosition += 15;
           });
           
           yPosition += 20;
@@ -157,7 +221,7 @@ export class DocumentGenerator {
       new Paragraph({ text: "" }), // Empty line
     );
 
-    // Dynamic Sections
+    // Dynamic Sections with Structure Preservation
     Object.entries(groupedFields).forEach(([sectionName, sectionFields]) => {
       // Section Header
       children.push(
@@ -174,25 +238,107 @@ export class DocumentGenerator {
         })
       );
 
-      // Section Fields
-      sectionFields.forEach((field: DynamicField) => {
-        const value = field.value?.toString() || 'Not specified';
-        let displayValue = value;
-        
-        if (field.type === 'boolean') {
-          displayValue = field.value ? 'Yes' : 'No';
-        } else if (field.type === 'date' && field.value) {
-          displayValue = new Date(field.value.toString()).toLocaleDateString();
-        }
+      // Sort fields by order to maintain structure
+      const sortedFields = sectionFields.sort((a, b) => {
+        const orderA = a.layout?.order || 0;
+        const orderB = b.layout?.order || 0;
+        return orderA - orderB;
+      });
 
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: `${field.label}: `, bold: true }),
-              new TextRun({ text: displayValue })
-            ]
-          })
-        );
+      // Render fields preserving original structure
+      sortedFields.forEach((field: DynamicField) => {
+        switch (field.type) {
+          case 'table':
+            // Add table to DOCX
+            const tableData = field.value as string[][] || [["Header"], ["Data"]];
+            
+            // Table title
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: field.label,
+                    bold: true,
+                    size: 20,
+                    color: "1E40AF"
+                  })
+                ]
+              })
+            );
+            
+            // Note: Full table implementation would require docx table API
+            // For now, we'll represent as formatted text
+            tableData.forEach((row, rowIndex) => {
+              const isHeader = rowIndex === 0;
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: row.join(' | '),
+                      bold: isHeader,
+                      color: isHeader ? "1E40AF" : "000000"
+                    })
+                  ]
+                })
+              );
+            });
+            
+            children.push(new Paragraph({ text: "" })); // Empty line
+            break;
+            
+          case 'heading':
+            const level = field.layout?.level || 2;
+            const headingLevel = level <= 6 ? level as 1|2|3|4|5|6 : 2;
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: field.value?.toString() || field.label,
+                    bold: true,
+                    size: Math.max(32 - (level * 4), 16),
+                    color: "1E40AF"
+                  })
+                ],
+                heading: [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6][headingLevel - 1]
+              })
+            );
+            break;
+            
+          case 'paragraph':
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: field.value?.toString() || '',
+                    size: 20
+                  })
+                ]
+              })
+            );
+            children.push(new Paragraph({ text: "" })); // Empty line
+            break;
+            
+          default:
+            // Regular field
+            const value = field.value?.toString() || 'Not specified';
+            let displayValue = value;
+            
+            if (field.type === 'boolean') {
+              displayValue = field.value ? 'Yes' : 'No';
+            } else if (field.type === 'date' && field.value) {
+              displayValue = new Date(field.value.toString()).toLocaleDateString();
+            }
+
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${field.label}: `, bold: true }),
+                  new TextRun({ text: displayValue })
+                ]
+              })
+            );
+            break;
+        }
       });
 
       children.push(new Paragraph({ text: "" })); // Empty line
