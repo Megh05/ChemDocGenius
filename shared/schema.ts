@@ -54,9 +54,21 @@ export const dynamicFieldSchema = z.object({
   }).optional(),
 });
 
+// Schema for detected sections with selection capability
+export const detectedSectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  content: z.string(),
+  type: z.enum(['heading', 'paragraph', 'table', 'list', 'field_group']),
+  preview: z.string(),
+  fields: z.array(dynamicFieldSchema),
+  selected: z.boolean().default(false),
+  order: z.number(),
+});
+
 export const extractedDataSchema = z.object({
   documentType: z.string(),
-  detectedSections: z.array(z.string()),
+  detectedSections: z.array(detectedSectionSchema),
   fields: z.array(dynamicFieldSchema),
   structure: z.object({
     hasHeaders: z.boolean().default(false),
@@ -92,6 +104,7 @@ export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
 export type ExtractedData = z.infer<typeof extractedDataSchema>;
 export type DynamicField = z.infer<typeof dynamicFieldSchema>;
+export type DetectedSection = z.infer<typeof detectedSectionSchema>;
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type User = typeof users.$inferSelect;

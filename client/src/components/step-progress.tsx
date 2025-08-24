@@ -8,8 +8,9 @@ interface StepProgressProps {
 const steps = [
   { id: 1, name: "Upload Document" },
   { id: 2, name: "Process & Extract" },
-  { id: 3, name: "Review & Edit" },
-  { id: 4, name: "Generate & Save" },
+  { id: 3, name: "Select Sections" },
+  { id: 4, name: "Review & Edit" },
+  { id: 5, name: "Generate & Save" },
 ];
 
 export default function StepProgress({ currentStep }: StepProgressProps) {

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import StepProgress from "@/components/step-progress";
 import UploadStep from "@/components/upload-step";
 import ProcessingStep from "@/components/processing-step";
+import SectionSelectionStep from "@/components/section-selection-step";
 import ReviewStep from "@/components/review-step";
 import GenerateStep from "@/components/generate-step";
 import SettingsModal from "@/components/settings-modal";
@@ -70,8 +71,20 @@ export default function Home() {
       case 2:
         return <ProcessingStep document={currentDocument} />;
       case 3:
-        return <ReviewStep document={currentDocument} />;
+        return currentDocument ? (
+          <SectionSelectionStep 
+            document={currentDocument} 
+            onSectionsSelected={(selectedSections) => {
+              // Store selected sections and proceed to review
+              // TODO: Update document with selected sections
+              goToStep(4);
+            }}
+            onBack={() => goToStep(2)}
+          />
+        ) : <div>Loading...</div>;
       case 4:
+        return <ReviewStep document={currentDocument} />;
+      case 5:
         return <GenerateStep document={currentDocument} />;
       default:
         return <UploadStep />;
