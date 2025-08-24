@@ -9,8 +9,13 @@ export class MistralService {
   private getApiKey(settings: Settings): string {
     if (settings.apiKey) return settings.apiKey;
     if (settings.encryptedApiKey) {
-      // In a real implementation, decrypt the API key here
-      return settings.encryptedApiKey;
+      // Decrypt the base64-encoded API key
+      try {
+        return Buffer.from(settings.encryptedApiKey, 'base64').toString('utf-8');
+      } catch (error) {
+        console.error("Failed to decrypt API key:", error);
+        return settings.encryptedApiKey; // Fallback to raw value
+      }
     }
     throw new Error("No API key available");
   }
@@ -18,6 +23,7 @@ export class MistralService {
   async testConnection(settings: Settings): Promise<boolean> {
     try {
       const apiKey = this.getApiKey(settings);
+      console.log("Testing connection with API key length:", apiKey.length);
       
       const response = await fetch(`${this.baseUrl}/models`, {
         headers: {
@@ -25,6 +31,12 @@ export class MistralService {
           'Content-Type': 'application/json'
         }
       });
+
+      console.log("Mistral API response status:", response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log("Mistral API error:", errorText);
+      }
 
       return response.ok;
     } catch (error) {

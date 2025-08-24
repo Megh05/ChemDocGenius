@@ -6,8 +6,8 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertDocumentSchema, insertSettingsSchema, extractedDataSchema } from "@shared/schema";
 import { MistralService } from "./services/mistral";
-import { DocumentGenerator } from "./services/document-generator";
-import { FileStorage } from "./services/file-storage";
+import { DocumentGenerator } from "./services/document-generator.js";
+import { FileStorage } from "./services/file-storage.js";
 
 const upload = multer({ 
   dest: "uploads/",
