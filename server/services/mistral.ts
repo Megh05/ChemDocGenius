@@ -51,6 +51,9 @@ export class MistralService {
       const pdfBuffer = fs.readFileSync(filePath);
       const pdfData = await pdf(pdfBuffer);
       const extractedText = pdfData.text;
+      
+      console.log("Extracted text length:", extractedText.length);
+      console.log("First 200 chars:", extractedText.substring(0, 200));
 
       // Use Mistral AI to extract structured data
       const structuredData = await this.extractStructuredData(extractedText, settings);
@@ -67,15 +70,23 @@ export class MistralService {
     const apiKey = this.getApiKey(settings);
     
     const prompt = `
-You are an advanced document structure analysis system. Analyze this document and PRESERVE its original layout structure including tables, headings, paragraphs, and visual formatting.
+You are an advanced document structure analysis system specialized in processing Certificate of Analysis (COA) documents and supplier documentation. Analyze this document and extract ALL meaningful content into structured sections.
+
+CRITICAL: You MUST always return at least 2-3 sections even if the document appears simple. Never return empty sections.
 
 Your tasks:
-1. Identify the document type
-2. Detect ALL structural elements: headings, tables, paragraphs, lists
-3. Extract data while maintaining the original visual structure
-4. For tables: preserve headers, rows, and cell relationships
-5. For headings: identify hierarchy levels (1-6)
-6. Maintain the exact order of elements as they appear
+1. Identify the document type (default to "Certificate of Analysis" if unclear)
+2. Create meaningful sections that group related content
+3. Extract ALL text content into appropriate fields
+4. For any tabular data: preserve as table structure
+5. For headings: create heading fields with proper levels
+6. Group related fields into logical sections
+
+MANDATORY SECTIONS TO CREATE:
+- Document Information (document title, dates, identifiers)
+- Product Information (product details, specifications)
+- Test Results or Analysis Data (any measurements, values, results)
+- Additional Information (any remaining content)
 
 RETURN THIS EXACT JSON STRUCTURE:
 {
@@ -130,11 +141,14 @@ RETURN THIS EXACT JSON STRUCTURE:
 }
 
 CRITICAL RULES:
+- NEVER return empty detectedSections array - always create at least 2-3 meaningful sections
 - For TABLES: Use type="table", value must be array of arrays [[headers],[row1],[row2]]
 - For HEADINGS: Use type="heading", set layout.level (1-6), preserve hierarchy
 - For regular fields: Use appropriate type (text, number, date, etc.)
 - MAINTAIN EXACT ORDER: layout.order must reflect document sequence
 - PRESERVE STRUCTURE: Don't flatten tables into individual fields
+- If document seems empty, extract whatever text is available into meaningful sections
+- Always populate detectedSections with proper section objects that have fields arrays
 
 EXAMPLE TABLE EXTRACTION:
 If you see:
@@ -156,10 +170,12 @@ Extract as:
   }
 }
 
-Document text:
+Document text to analyze:
 ${text}
 
-Return only the JSON object:`;
+IMPORTANT: Even if the document text appears minimal or poorly formatted, you MUST create meaningful sections and extract all available content. Do not return empty arrays.
+
+Return only the JSON object with populated detectedSections and fields:`;
 
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -261,128 +277,7 @@ Return only the JSON object:`;
       return parsedData;
     } catch (error) {
       console.error("Mistral API call failed:", error);
-      
-      // Enhanced fallback with better structure when API fails
-      console.log("API failed, using enhanced text parsing fallback");
-      
-      // Basic text parsing as fallback
-      const lines = text.split('\n').filter(line => line.trim().length > 0);
-      const fields: any[] = [];
-      let fieldId = 1;
-      
-      // Try to extract basic information from text
-      lines.forEach((line, index) => {
-        const trimmedLine = line.trim();
-        
-        // Skip very short lines
-        if (trimmedLine.length < 3) return;
-        
-        // Check if line contains colon (key-value pair)
-        if (trimmedLine.includes(':')) {
-          const [label, ...valueParts] = trimmedLine.split(':');
-          const value = valueParts.join(':').trim();
-          
-          if (label.trim() && value) {
-            fields.push({
-              id: `field_${fieldId++}`,
-              label: label.trim(),
-              value: value,
-              type: "text" as const,
-              section: "Document Information",
-              required: false,
-              layout: {
-                structureType: "field" as const,
-                order: index + 1
-              }
-            });
-          }
-        } else if (trimmedLine.length > 20) {
-          // Treat longer lines as paragraphs
-          fields.push({
-            id: `paragraph_${fieldId++}`,
-            label: `Content ${fieldId}`,
-            value: trimmedLine,
-            type: "paragraph" as const,
-            section: "Document Content",
-            required: false,
-            layout: {
-              structureType: "paragraph" as const,
-              order: index + 1
-            }
-          });
-        } else {
-          // Treat as potential heading
-          fields.push({
-            id: `heading_${fieldId++}`,
-            label: trimmedLine,
-            value: trimmedLine,
-            type: "heading" as const,
-            section: "Document Content",
-            required: false,
-            layout: {
-              structureType: "heading" as const,
-              level: 2,
-              order: index + 1
-            }
-          });
-        }
-      });
-      
-      // Create properly structured sections
-      const documentInfoFields = fields.filter(f => f.section === "Document Information");
-      const contentFields = fields.filter(f => f.section === "Document Content");
-      
-      const detectedSections = [
-        {
-          id: "doc_info_section",
-          title: "Document Information", 
-          content: "Basic document information and metadata",
-          type: "field_group" as const,
-          preview: documentInfoFields.length > 0 ? documentInfoFields[0].value : "Document details",
-          fields: documentInfoFields,
-          selected: false,
-          order: 1
-        },
-        {
-          id: "doc_content_section", 
-          title: "Document Content",
-          content: "Main document content and extracted text",
-          type: "field_group" as const,
-          preview: contentFields.length > 0 ? contentFields[0].value : "Document content",
-          fields: contentFields,
-          selected: false,
-          order: 2
-        }
-      ];
-
-      return {
-        documentType: "Certificate of Analysis",
-        detectedSections: detectedSections,
-        fields: fields.length > 0 ? fields : [
-          {
-            id: "document_title",
-            label: "Document Title",
-            value: "Extracted Document",
-            type: "text" as const,
-            section: "Document Information",
-            required: false,
-            layout: {
-              structureType: "field" as const,
-              order: 1
-            }
-          }
-        ],
-        structure: {
-          hasHeaders: true,
-          hasTables: false,
-          hasLists: false
-        },
-        metadata: {
-          extractedAt: new Date().toISOString(),
-          confidence: 0.6,
-          totalFields: fields.length || 1
-        }
-      };
+      throw new Error(`Mistral API processing failed: ${error.message}`);
     }
   }
 }
