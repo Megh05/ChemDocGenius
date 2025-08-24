@@ -264,53 +264,62 @@ Return only the JSON object with populated detectedSections and fields:`;
         })
       });
       
-      // Handle rate limiting with retry
+      // Handle rate limiting with exponential backoff
       if (response.status === 429) {
-        console.log("Rate limited, waiting before retry...");
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        console.log("Rate limited, implementing exponential backoff...");
         
-        const retryResponse = await fetch(`${this.baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'mistral-large-latest',
-            messages: [
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            temperature: 0.1,
-            max_tokens: 4000
-          })
-        });
-        
-        if (retryResponse.ok) {
-          const retryResult = await retryResponse.json();
-          const retryContent = retryResult.choices[0]?.message?.content;
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt), 30000); // 2s, 4s, 8s, 16s (max 30s)
+          console.log(`Retry attempt ${attempt}/4, waiting ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
           
-          if (retryContent) {
-            const jsonMatch = retryContent.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const parsedData = JSON.parse(jsonMatch[0]);
-              
-              if (parsedData.fields) {
-                parsedData.fields.forEach((field: any, index: number) => {
-                  if (!field.id) {
-                    field.id = `field_${index + 1}`;
-                  }
-                });
+          const retryResponse = await fetch(`${this.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'mistral-large-latest',
+              messages: [
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              temperature: 0.1,
+              max_tokens: 4000
+            })
+          });
+          
+          if (retryResponse.ok) {
+            const retryResult = await retryResponse.json();
+            const retryContent = retryResult.choices[0]?.message?.content;
+            
+            if (retryContent) {
+              const jsonMatch = retryContent.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsedData = JSON.parse(jsonMatch[0]);
+                
+                if (parsedData.fields) {
+                  parsedData.fields.forEach((field: any, index: number) => {
+                    if (!field.id) {
+                      field.id = `field_${index + 1}`;
+                    }
+                  });
+                }
+                
+                console.log(`Retry successful on attempt ${attempt}`);
+                return parsedData;
               }
-              
-              return parsedData;
             }
+          } else if (retryResponse.status !== 429) {
+            // If it's not a rate limit error, break out and handle below
+            break;
           }
         }
         
-        throw new Error("Rate limited and retry failed");
+        throw new Error("Rate limited and all retries failed");
       }
       
       if (!response.ok) {
