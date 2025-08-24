@@ -1,6 +1,5 @@
 import { Settings, ExtractedData, extractedDataSchema, DynamicField } from "@shared/schema";
 import fs from "fs";
-import pdf from "pdf-parse";
 
 export class MistralService {
   private apiKey: string | null = null;
@@ -72,62 +71,51 @@ export class MistralService {
   }
 
   private async extractTextWithMistralOCR(filePath: string, settings: Settings): Promise<string> {
-    try {
-      // Use Mistral's dedicated OCR API
-      const apiKey = this.getApiKey(settings);
-      const pdfBuffer = fs.readFileSync(filePath);
-      const base64Pdf = pdfBuffer.toString('base64');
+    // Use ONLY Mistral's dedicated OCR API - no fallbacks
+    const apiKey = this.getApiKey(settings);
+    const pdfBuffer = fs.readFileSync(filePath);
+    const base64Pdf = pdfBuffer.toString('base64');
 
-      console.log("Calling Mistral OCR API...");
-      const response = await fetch(`${this.baseUrl}/ocr`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'mistral-ocr-latest',
-          document: {
-            type: 'document_url',
-            document_url: `data:application/pdf;base64,${base64Pdf}`
-          }
-        })
-      });
+    console.log("Calling Mistral OCR API...");
+    const response = await fetch(`${this.baseUrl}/ocr`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'mistral-ocr-latest',
+        document: {
+          type: 'document_url',
+          document_url: `data:application/pdf;base64,${base64Pdf}`
+        }
+      })
+    });
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log("Mistral OCR response status:", response.status);
-        
-        // Extract text from all pages
-        let fullText = '';
-        if (result.pages && Array.isArray(result.pages)) {
-          for (const page of result.pages) {
-            if (page.markdown) {
-              fullText += page.markdown + '\n\n';
-            }
-          }
-        }
-        
-        if (fullText.length > 10) {
-          console.log("Mistral OCR successful - extracted", fullText.length, "characters");
-          return fullText;
-        }
-      } else {
-        const errorText = await response.text();
-        console.log("Mistral OCR API error:", response.status, errorText);
-      }
-      
-      console.log("Mistral OCR failed, falling back to pdf-parse");
-    } catch (error) {
-      console.log("Mistral OCR error:", error);
-      console.log("Falling back to pdf-parse");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Mistral OCR API failed: ${response.status} - ${errorText}`);
     }
 
-    // Fallback to pdf-parse if Mistral OCR fails
-    const pdfBuffer = fs.readFileSync(filePath);
-    const pdfData = await pdf(pdfBuffer);
-    console.log("Using pdf-parse, extracted", pdfData.text.length, "characters");
-    return pdfData.text;
+    const result = await response.json();
+    console.log("Mistral OCR response status:", response.status);
+    
+    // Extract text from all pages
+    let fullText = '';
+    if (result.pages && Array.isArray(result.pages)) {
+      for (const page of result.pages) {
+        if (page.markdown) {
+          fullText += page.markdown + '\n\n';
+        }
+      }
+    }
+    
+    if (fullText.length < 10) {
+      throw new Error("Mistral OCR extracted insufficient text from document");
+    }
+
+    console.log("Mistral OCR successful - extracted", fullText.length, "characters");
+    return fullText;
   }
 
   private async extractStructuredData(text: string, settings: Settings): Promise<any> {
