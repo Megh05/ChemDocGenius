@@ -343,7 +343,7 @@ Return only the JSON object with populated detectedSections and fields:`;
       let parsedData;
       try {
         parsedData = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
+      } catch (parseError: any) {
         console.log("JSON parse error at position:", parseError.message);
         console.log("Raw JSON (first 1000 chars):", jsonMatch[0].substring(0, 1000));
         console.log("Raw JSON (around error position):", jsonMatch[0].substring(14800, 15000));
@@ -358,7 +358,7 @@ Return only the JSON object with populated detectedSections and fields:`;
           console.log("Attempting to parse fixed JSON...");
           parsedData = JSON.parse(fixedJson);
           console.log("Successfully parsed fixed JSON!");
-        } catch (fixedError) {
+        } catch (fixedError: any) {
           console.log("Fixed JSON also failed:", fixedError.message);
           console.log("Fixed JSON (around error):", fixedJson.substring(14800, 15000));
           throw new Error(`JSON parsing failed: ${parseError.message}`);
@@ -367,59 +367,67 @@ Return only the JSON object with populated detectedSections and fields:`;
       
       console.log("Raw Mistral LLM response:", parsedData);
       
-      // Ensure all fields have unique IDs
-      if (parsedData.fields) {
-        parsedData.fields.forEach((field: any, index: number) => {
-          if (!field.id) {
-            field.id = `field_${index + 1}`;
-          }
-        });
-      }
+      // Transform the data to match our schema
+      const transformedData = this.transformMistralResponse(parsedData);
       
-      // Ensure detectedSections is always an array and populated
-      if (!parsedData.detectedSections || !Array.isArray(parsedData.detectedSections) || parsedData.detectedSections.length === 0) {
-        console.log("No sections detected by Mistral, creating default sections");
-        
-        // Create default sections based on fields
-        const sections = new Map();
-        if (parsedData.fields && Array.isArray(parsedData.fields)) {
-          parsedData.fields.forEach((field: any) => {
-            const sectionName = field.section || "Document Content";
-            if (!sections.has(sectionName)) {
-              sections.set(sectionName, []);
-            }
-            sections.get(sectionName).push(field);
-          });
-        }
-        
-        // If no fields either, create minimum viable sections
-        if (sections.size === 0) {
-          sections.set("Document Information", []);
-          sections.set("Content", []);
-        }
-        
-        parsedData.detectedSections = Array.from(sections.entries()).map(([title, fields], index) => ({
-          id: `section_${index + 1}`,
-          title: title,
-          content: `${title} section`,
-          type: "field_group",
-          preview: fields.length > 0 ? `${fields.length} fields detected` : "Empty section",
-          fields: fields,
-          selected: false,
-          order: index + 1
-        }));
-      }
-      
-      console.log("Final processed data:", {
-        documentType: parsedData.documentType,
-        sectionsCount: parsedData.detectedSections?.length || 0,
-        fieldsCount: parsedData.fields?.length || 0
-      });
-      
-      return parsedData;
-    } catch (error) {
+      return transformedData;
+    } catch (error: any) {
       console.error("Mistral API call failed:", error);
       throw new Error(`Mistral API processing failed: ${error.message}`);
     }
+  }
+
+  private transformMistralResponse(data: any): any {
+    // Transform Mistral's response to match our schema
+    const transformed = {
+      documentType: data.documentType || "Certificate of Analysis",
+      detectedSections: data.detectedSections || [],
+      fields: []
+    };
+
+    // Transform fields - convert complex values to simple strings
+    if (data.fields && Array.isArray(data.fields)) {
+      transformed.fields = data.fields.map((field: any, index: number) => {
+        let value = field.value;
+        
+        // Convert complex objects to strings
+        if (typeof value === 'object' && value !== null) {
+          if (Array.isArray(value)) {
+            value = value.join(', ');
+          } else {
+            value = JSON.stringify(value);
+          }
+        }
+        
+        return {
+          id: field.id || `field_${index + 1}`,
+          label: field.label || field.name || `Field ${index + 1}`,
+          value: String(value || ''),
+          type: field.type || 'text',
+          section: field.section || 'general'
+        };
+      });
+    }
+
+    // Ensure detectedSections are objects with required properties
+    if (transformed.detectedSections && Array.isArray(transformed.detectedSections)) {
+      transformed.detectedSections = transformed.detectedSections.map((section: any, index: number) => {
+        if (typeof section === 'string') {
+          return {
+            id: `section_${index + 1}`,
+            title: section,
+            content: `Content for ${section}`
+          };
+        }
+        return {
+          id: section.id || `section_${index + 1}`,
+          title: section.title || section.name || `Section ${index + 1}`,
+          content: section.content || section.description || ''
+        };
+      });
+    }
+
+    console.log("Transformed data:", JSON.stringify(transformed, null, 2));
+    return transformed;
   }
 }
