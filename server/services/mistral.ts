@@ -76,7 +76,8 @@ export class MistralService {
     const pdfBuffer = fs.readFileSync(filePath);
     const base64Pdf = pdfBuffer.toString('base64');
 
-    console.log("Calling Mistral OCR API...");
+    console.log("Calling Mistral OCR API with file size:", pdfBuffer.length, "bytes");
+    
     const response = await fetch(`${this.baseUrl}/ocr`, {
       method: 'POST',
       headers: {
@@ -88,30 +89,44 @@ export class MistralService {
         document: {
           type: 'document_url',
           document_url: `data:application/pdf;base64,${base64Pdf}`
-        }
+        },
+        include_image_base64: false
       })
     });
 
+    console.log("Mistral OCR response status:", response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
+      console.log("Mistral OCR error response:", errorText);
       throw new Error(`Mistral OCR API failed: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();
-    console.log("Mistral OCR response status:", response.status);
+    console.log("Mistral OCR response structure:", Object.keys(result));
     
     // Extract text from all pages
     let fullText = '';
     if (result.pages && Array.isArray(result.pages)) {
-      for (const page of result.pages) {
+      console.log("Found", result.pages.length, "pages");
+      for (let i = 0; i < result.pages.length; i++) {
+        const page = result.pages[i];
+        console.log(`Page ${i + 1} keys:`, Object.keys(page));
         if (page.markdown) {
           fullText += page.markdown + '\n\n';
+        } else if (page.text) {
+          fullText += page.text + '\n\n';
         }
       }
+    } else {
+      console.log("No pages found in OCR response");
+      console.log("Full OCR response:", JSON.stringify(result, null, 2));
     }
     
+    console.log("Total extracted text length:", fullText.length);
+    
     if (fullText.length < 10) {
-      throw new Error("Mistral OCR extracted insufficient text from document");
+      throw new Error(`Mistral OCR extracted insufficient text from document. Only ${fullText.length} characters extracted.`);
     }
 
     console.log("Mistral OCR successful - extracted", fullText.length, "characters");
