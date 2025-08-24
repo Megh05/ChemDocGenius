@@ -26,8 +26,8 @@ export default function Home() {
       const response = await fetch("/api/settings/test", { method: "POST" });
       return response.json();
     },
-    refetchInterval: 30000, // Check every 30 seconds
     retry: false,
+    enabled: false, // Disabled to avoid consuming rate limit quota
   });
 
   // Update LLM status based on connection query
